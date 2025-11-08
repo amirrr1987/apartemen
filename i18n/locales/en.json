@@ -1,0 +1,14 @@
+{
+  "home": {
+    "title": "Home"
+  },
+  "about-us": {
+    "title": "About Us"
+  },
+  "gallery": {
+    "title": "Gallery"
+  },
+  "contact-us": {
+    "title": "Contact Us"
+  }
+}
