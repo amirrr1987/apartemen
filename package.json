@@ -1,28 +1,46 @@
 {
-  "name": "drjamei",
-  "type": "module",
+  "name": "aparteman",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "build": "nuxt build",
-    "dev": "nuxt dev",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "type-check": "vue-tsc --noEmit",
+    "preview": "vite preview",
+    "preview:pwa": "vite build && vite preview --host --port 4178"
   },
   "dependencies": {
-    "@nuxt/content": "3.8.0",
-    "@nuxt/eslint": "1.10.0",
-    "@nuxt/image": "2.0.0",
-    "@nuxt/scripts": "0.13.0",
-    "@nuxt/test-utils": "3.20.1",
-    "@nuxt/ui": "4.1.0",
-    "@nuxtjs/i18n": "10.2.0",
-    "@unhead/vue": "^2.0.3",
-    "better-sqlite3": "^12.4.1",
-    "eslint": "^9.0.0",
-    "nuxt": "^4.2.1",
-    "typescript": "^5.6.3",
+    "@persian-tools/persian-tools": "^4.0.4",
+    "@popperjs/core": "^2.11.8",
+    "@vueuse/core": "^14.4.0",
+    "@vueuse/gesture": "^2.0.0",
+    "@vueuse/integrations": "^14.4.0",
+    "@vueuse/router": "^14.4.0",
+    "bootstrap": "^5.3.8",
+    "bootstrap-icons": "^1.13.1",
+    "date-fns-jalali": "4.4.0-0",
+    "gsap": "^3.15.0",
+    "nprogress": "^0.2.0",
+    "pinia": "^4.0.3",
+    "vazirmatn": "^33.0.3",
     "vue": "^3.5.22",
-    "vue-router": "^4.6.3"
+    "vue-router": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.2",
+    "@types/nprogress": "^0.2.3",
+    "@vite-pwa/assets-generator": "^1.0.2",
+    "@vitejs/plugin-vue": "^6.0.1",
+    "@vue/tsconfig": "^0.8.1",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.9",
+    "vite-plugin-pwa": "^1.1.0",
+    "vue-tsc": "^3.1.0",
+    "workbox-window": "^7.4.0"
+  },
+  "resolutions": {
+    "sharp": "^0.33.5",
+    "sharp-ico": "^0.1.5"
   }
 }
