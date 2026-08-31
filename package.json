@@ -42,10 +42,5 @@
     "vue-tsc": "^3.1.0",
     "workbox-window": "^7.4.0"
   },
-  "pnpm": {
-    "overrides": {
-      "sharp": "^0.33.5",
-      "sharp-ico": "^0.1.5"
-    }
-  }
+  "packageManager": "pnpm@10.30.3"
 }
