@@ -283,6 +283,19 @@ button.panel {
   color: var(--muted);
 }
 
+.chip.danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.db-loading {
+  display: grid;
+  place-items: center;
+  min-height: 100dvh;
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .unit-row {
   display: flex;
   align-items: center;

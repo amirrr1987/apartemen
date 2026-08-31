@@ -8,9 +8,11 @@
     "build": "vue-tsc -b && vite build",
     "type-check": "vue-tsc --noEmit",
     "preview": "vite preview",
-    "preview:pwa": "vite build && vite preview --host --port 4178"
+    "preview:pwa": "vite build && vite preview --host --port 4178",
+    "db:init": "tsx --env-file=.env scripts/init-db.ts"
   },
   "dependencies": {
+    "@libsql/client": "^0.15.15",
     "@persian-tools/persian-tools": "^4.0.4",
     "@popperjs/core": "^2.11.8",
     "@vueuse/core": "^14.4.0",
@@ -33,6 +35,7 @@
     "@vite-pwa/assets-generator": "^1.0.2",
     "@vitejs/plugin-vue": "^6.0.1",
     "@vue/tsconfig": "^0.8.1",
+    "tsx": "^4.20.5",
     "typescript": "~5.9.3",
     "vite": "^7.1.9",
     "vite-plugin-pwa": "^1.1.0",

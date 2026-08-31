@@ -73,6 +73,10 @@ async function installApp() {
 </script>
 
 <template>
+  <div v-if="!store.ready" class="db-loading">
+    <p>در حال بارگذاری از پایگاه داده…</p>
+  </div>
+  <template v-else>
   <div class="screen" :class="{ 'has-fab': showFab }">
     <header class="topbar">
       <div class="brand">
@@ -86,6 +90,14 @@ async function installApp() {
         </div>
       </div>
       <div class="d-flex gap-2">
+        <span v-if="store.syncing" class="chip muted">
+          <AppIcon name="cloud-upload" size="sm" />
+          ذخیره…
+        </span>
+        <span v-else-if="store.dbError" class="chip danger" :title="store.dbError">
+          <AppIcon name="cloud-slash" size="sm" />
+          خطای همگام‌سازی
+        </span>
         <span v-if="!online" class="chip muted">
           <AppIcon name="wifi-off" size="sm" />
           آفلاین
@@ -159,4 +171,5 @@ async function installApp() {
   <ConfirmDialog />
   <PWABadge />
   <div v-if="message" ref="toastEl" class="pwa-toast">{{ message }}</div>
+  </template>
 </template>

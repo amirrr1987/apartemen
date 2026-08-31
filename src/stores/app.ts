@@ -1,8 +1,9 @@
-import { computed, reactive, watch } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
-import { useLocalStorage } from '@vueuse/core'
+import { useDebounceFn } from '@vueuse/core'
 import { monthSummaries, monthTotals, splitExpense } from '../lib/calc'
 import { createDefaultState, hasTenant, inferNature, partyLabel } from '../data/defaults'
+import { isDbConfigured, loadAppState, saveAppState } from '../lib/db'
 import { newId } from '../lib/format'
 import { currentPeriod } from '../lib/jalali'
 import type { AppState, CostNature, CostType, Expense, PartyRole, Unit } from '../types'
@@ -42,7 +43,7 @@ function normalizeState(parsed: Partial<AppState>): AppState {
   }
 }
 
-function loadState(): AppState {
+function loadLocalState(): AppState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return createDefaultState()
@@ -52,20 +53,75 @@ function loadState(): AppState {
   }
 }
 
+function saveLocalState(state: AppState) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+}
+
 export const useAppStore = defineStore('app', () => {
-  const persisted = useLocalStorage(STORAGE_KEY, loadState(), {
-    deep: true,
-    serializer: {
-      read: (raw) => normalizeState(JSON.parse(raw) as Partial<AppState>),
-      write: (value) => JSON.stringify(value),
-    },
-  })
-  const state = reactive(persisted.value) as AppState
+  const ready = ref(false)
+  const syncing = ref(false)
+  const dbError = ref<string | null>(null)
+  const state = reactive(loadLocalState()) as AppState
+
+  const persistLocal = useDebounceFn(() => {
+    saveLocalState(JSON.parse(JSON.stringify(state)) as AppState)
+  }, 300)
+
+  const persistRemote = useDebounceFn(async () => {
+    if (!isDbConfigured()) return
+    syncing.value = true
+    dbError.value = null
+    try {
+      await saveAppState(JSON.parse(JSON.stringify(state)) as AppState)
+    } catch (error) {
+      dbError.value = error instanceof Error ? error.message : 'خطا در ذخیره در پایگاه داده'
+    } finally {
+      syncing.value = false
+    }
+  }, 800)
+
+  async function init() {
+    if (!isDbConfigured()) {
+      ready.value = true
+      return
+    }
+
+    try {
+      const remote = await loadAppState()
+      if (remote) {
+        applyState(remote)
+      } else {
+        const local = loadLocalState()
+        const hasLocalData =
+          local.expenses.length > 0 ||
+          local.payments.length > 0 ||
+          local.settings.buildingName !== 'ساختمان' ||
+          local.settings.managerFee > 0
+        await saveAppState(hasLocalData ? local : createDefaultState())
+        if (hasLocalData) applyState(local)
+      }
+      dbError.value = null
+    } catch (error) {
+      dbError.value = error instanceof Error ? error.message : 'خطا در بارگذاری از پایگاه داده'
+    } finally {
+      ready.value = true
+    }
+  }
+
+  function applyState(next: AppState) {
+    const normalized = normalizeState(next)
+    state.units = normalized.units
+    state.expenses = normalized.expenses
+    state.payments = normalized.payments
+    state.settings = normalized.settings
+    state.currentPeriod = normalized.currentPeriod
+  }
 
   watch(
     state,
-    (value) => {
-      persisted.value = JSON.parse(JSON.stringify(value)) as AppState
+    () => {
+      void persistLocal()
+      void persistRemote()
     },
     { deep: true },
   )
@@ -246,21 +302,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   function importBackup(raw: string) {
-    const next = normalizeState(JSON.parse(raw) as Partial<AppState>)
-    state.units = next.units
-    state.expenses = next.expenses
-    state.payments = next.payments
-    state.settings = next.settings
-    state.currentPeriod = next.currentPeriod
+    applyState(normalizeState(JSON.parse(raw) as Partial<AppState>))
   }
 
   function resetAll() {
-    const fresh = createDefaultState()
-    state.units = fresh.units
-    state.expenses = fresh.expenses
-    state.payments = fresh.payments
-    state.settings = fresh.settings
-    state.currentPeriod = fresh.currentPeriod
+    applyState(createDefaultState())
   }
 
   function csvCell(value: string | number): string {
@@ -319,7 +365,11 @@ export const useAppStore = defineStore('app', () => {
   }
 
   return {
+    ready,
+    syncing,
+    dbError,
     state,
+    init,
     summaries,
     totals,
     periodExpenses,

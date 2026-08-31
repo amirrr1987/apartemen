@@ -9,6 +9,7 @@ import 'bootstrap/js/dist/dropdown'
 import './styles/app.css'
 import App from './App.vue'
 import router from './router'
+import { useAppStore } from './stores/app'
 
 gsap.defaults({ duration: 0.4, ease: 'power2.out' })
 
@@ -19,6 +20,11 @@ else if (['expenses', 'payments', 'report', 'units', 'guide', 'settings'].includ
 }
 
 const app = createApp(App)
-app.use(createPinia())
+const pinia = createPinia()
+app.use(pinia)
 app.use(router)
-app.mount('#app')
+
+const store = useAppStore(pinia)
+void store.init().finally(() => {
+  app.mount('#app')
+})
