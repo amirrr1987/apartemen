@@ -1,22 +1,14 @@
 import { createClient } from '@libsql/client'
-import {
-  localDbPath,
-  resolveTursoAuthToken,
-  tursoHttpUrl,
-} from '../database.ts'
+import { resolveTursoAuthToken, tursoHttpUrl } from '../database.ts'
 import { createDefaultState } from '../src/data/defaults.ts'
 import { SCHEMA_STATEMENTS } from '../src/lib/schema.ts'
 
-const isLocal = process.argv.includes('--local')
-const target = isLocal ? localDbPath : tursoHttpUrl
-const authToken = isLocal ? undefined : resolveTursoAuthToken()
-
 const db = createClient({
-  url: target,
-  authToken,
+  url: tursoHttpUrl,
+  authToken: resolveTursoAuthToken(),
 })
 
-console.log(`Initializing schema on ${target} ...`)
+console.log(`Initializing schema on ${tursoHttpUrl} ...`)
 
 try {
   for (const sql of SCHEMA_STATEMENTS) {
@@ -75,7 +67,7 @@ try {
 } catch (error) {
   const message = error instanceof Error ? error.message : String(error)
   console.error('Database init failed:', message)
-  if (!isLocal && message.includes('400')) {
+  if (message.includes('400')) {
     console.error(
       'Hint: regenerate the token at https://app.turso.tech/amirrr1987/databases/apartemen and update .env',
     )

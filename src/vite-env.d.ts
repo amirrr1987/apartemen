@@ -4,6 +4,8 @@
 interface ImportMetaEnv {
   readonly VITE_TURSO_DATABASE_URL: string
   readonly VITE_TURSO_AUTH_TOKEN: string
+  readonly VITE_USERNAME: string
+  readonly VITE_PASSWORD: string
 }
 
 interface ImportMeta {

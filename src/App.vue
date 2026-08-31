@@ -12,8 +12,10 @@ import { usePageEnter } from './composables/usePageEnter'
 import { usePwaInstall } from './composables/usePwaInstall'
 import { useToast } from './composables/useToast'
 import { useAppStore } from './stores/app'
+import { useAuthStore } from './stores/auth'
 
 const store = useAppStore()
+const auth = useAuthStore()
 const route = useRoute()
 const router = useRouter()
 const online = useOnline()
@@ -41,9 +43,10 @@ watch(message, async (value) => {
 })
 
 const title = computed(() => store.state.settings.buildingName || 'ساختمان')
-const showFab = computed(() => route.meta.fab === true)
-const showBack = computed(() => ['expense-new', 'expense-edit', 'unit'].includes(String(route.name)))
-const showPeriod = computed(() => route.name !== 'guide' && route.name !== 'settings')
+const isLogin = computed(() => route.name === 'login')
+const showFab = computed(() => !isLogin.value && route.meta.fab === true)
+const showBack = computed(() => !isLogin.value && ['expense-new', 'expense-edit', 'unit'].includes(String(route.name)))
+const showPeriod = computed(() => !isLogin.value && route.name !== 'guide' && route.name !== 'settings')
 
 const tabs = [
   { to: '/', name: 'home', icon: 'house', iconActive: 'house-fill', label: 'خانه' },
@@ -70,10 +73,17 @@ async function installApp() {
   const ok = await install()
   notify(ok ? 'برنامه روی دستگاه نصب شد' : 'نصب لغو شد')
 }
+
+function onLogout() {
+  auth.logout()
+  void router.replace({ name: 'login' })
+}
 </script>
 
 <template>
-  <div v-if="!store.ready" class="db-loading">
+  <RouterView v-if="isLogin" />
+
+  <div v-else-if="!store.ready" class="db-loading">
     <p>در حال بارگذاری از پایگاه داده…</p>
   </div>
   <template v-else>
@@ -134,6 +144,12 @@ async function installApp() {
               <button class="dropdown-item d-flex align-items-center gap-2" type="button" @click="installApp">
                 <AppIcon name="download" size="sm" />
                 نصب روی دستگاه
+              </button>
+            </li>
+            <li>
+              <button class="dropdown-item d-flex align-items-center gap-2" type="button" @click="onLogout">
+                <AppIcon name="box-arrow-right" size="sm" />
+                خروج
               </button>
             </li>
           </ul>
