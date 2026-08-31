@@ -1,16 +1,17 @@
 export const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
-    building_name TEXT NOT NULL DEFAULT 'ساختمان',
-    water_equal_percent INTEGER NOT NULL DEFAULT 30,
-    water_person_percent INTEGER NOT NULL DEFAULT 70,
-    manager_fee INTEGER NOT NULL DEFAULT 0
+    building_name TEXT NOT NULL DEFAULT '',
+    manager_fee INTEGER NOT NULL DEFAULT 0,
+    setup_complete INTEGER NOT NULL DEFAULT 0,
+    expense_categories_json TEXT NOT NULL DEFAULT '[]'
   )`,
   `CREATE TABLE IF NOT EXISTS units (
     id INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
     area REAL NOT NULL,
     residents INTEGER NOT NULL,
+    has_parking INTEGER NOT NULL DEFAULT 0,
     owner TEXT NOT NULL DEFAULT '',
     tenant TEXT NOT NULL DEFAULT '',
     current_payer TEXT NOT NULL DEFAULT 'TENANT',
@@ -25,7 +26,8 @@ export const SCHEMA_STATEMENTS = [
     nature TEXT NOT NULL,
     period TEXT NOT NULL,
     unit_id INTEGER,
-    meters_json TEXT,
+    parking_scope TEXT NOT NULL DEFAULT 'ALL',
+    category TEXT NOT NULL DEFAULT 'سایر',
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
   )`,
@@ -42,4 +44,12 @@ export const SCHEMA_STATEMENTS = [
     value TEXT NOT NULL
   )`,
   `INSERT OR IGNORE INTO settings (id) VALUES (1)`,
+] as const
+
+export const SCHEMA_MIGRATIONS = [
+  `ALTER TABLE units ADD COLUMN has_parking INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE settings ADD COLUMN setup_complete INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE expenses ADD COLUMN parking_scope TEXT NOT NULL DEFAULT 'ALL'`,
+  `ALTER TABLE expenses ADD COLUMN category TEXT NOT NULL DEFAULT 'سایر'`,
+  `ALTER TABLE settings ADD COLUMN expense_categories_json TEXT NOT NULL DEFAULT '[]'`,
 ] as const

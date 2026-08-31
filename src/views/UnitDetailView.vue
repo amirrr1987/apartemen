@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
-import { COST_TYPES, hasTenant, natureLabel, partyLabel } from '../data/defaults'
+import { COST_TYPES, hasTenant, natureLabel, parkingLabel, partyLabel } from '../data/defaults'
 import { formatFaDate } from '../lib/jalali'
 import { formatPercent, formatToman, parseAmount } from '../lib/format'
 import { useAppStore } from '../stores/app'
@@ -34,6 +34,7 @@ const tenant = ref(unit.value?.tenant ?? '')
 const currentPayer = ref<PartyRole>(unit.value?.currentPayer ?? 'TENANT')
 const capitalPayer = ref<PartyRole>(unit.value?.capitalPayer ?? 'OWNER')
 const notes = ref(unit.value?.notes ?? '')
+const hasParking = ref(unit.value?.hasParking ?? false)
 
 const payAmount = ref('')
 const payParty = ref<'OWNER' | 'TENANT' | 'UNIT'>('OWNER')
@@ -50,6 +51,7 @@ watch(
     currentPayer.value = value.currentPayer
     capitalPayer.value = value.capitalPayer
     notes.value = value.notes
+    hasParking.value = value.hasParking
     payParty.value = hasTenant(value) ? 'TENANT' : 'OWNER'
   },
   { immediate: true },
@@ -118,6 +120,7 @@ function saveUnit() {
   unit.value.tenant = tenant.value.trim()
   unit.value.currentPayer = currentPayer.value
   unit.value.capitalPayer = capitalPayer.value
+  unit.value.hasParking = hasParking.value
   unit.value.notes = notes.value.trim()
   notify('اطلاعات واحد ذخیره شد')
 }
@@ -241,7 +244,7 @@ function togglePaid(party?: PartyRole) {
       <div v-else class="panel">
         <div v-for="row in summary.breakdown" :key="row.expense.id" class="split-row">
           <span>
-            {{ row.expense.title }}
+            {{ row.expense.category }} · {{ row.expense.title }}
             <small class="text-muted">
               ({{ typeLabel(row.expense.type) }} · {{ natureLabel(row.expense.nature) }} · {{ partyLabel(row.payer) }})
             </small>
@@ -270,6 +273,10 @@ function togglePaid(party?: PartyRole) {
       <input v-model="areaText" class="field mb-3" inputmode="decimal" />
       <label class="form-label">تعداد ساکنان دائم</label>
       <input v-model="residentsText" class="field mb-3" inputmode="numeric" />
+      <label class="form-check mb-3">
+        <input v-model="hasParking" class="form-check-input" type="checkbox" />
+        <span class="form-check-label">دارای حق استفاده از پارکینگ</span>
+      </label>
       <label class="form-label">یادداشت</label>
       <textarea v-model="notes" class="field mb-3" rows="2" placeholder="مثلاً کولر روی بام دارد" />
       <button class="primary-btn w-100" type="button" @click="saveUnit">

@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
-import { COST_TYPES, natureLabel } from '../data/defaults'
+import { COST_TYPES, natureLabel, parkingScopeLabel } from '../data/defaults'
 import { formatToman } from '../lib/format'
 import { periodLabel } from '../lib/jalali'
 import { useAppStore } from '../stores/app'
@@ -19,6 +19,7 @@ const { confirm } = useConfirm()
 const query = ref('')
 const deferred = ref('')
 const filter = ref<CostType | 'ALL'>('ALL')
+const categoryFilter = ref<string>('ALL')
 const applyQuery = useDebounceFn((value: string) => {
   deferred.value = value.trim()
 }, 180)
@@ -26,18 +27,21 @@ const applyQuery = useDebounceFn((value: string) => {
 const filtered = computed(() =>
   store.periodExpenses.filter((expense) => {
     if (filter.value !== 'ALL' && expense.type !== filter.value) return false
+    if (categoryFilter.value !== 'ALL' && expense.category !== categoryFilter.value) return false
     if (!deferred.value) return true
-    return expense.title.includes(deferred.value) || expense.notes.includes(deferred.value)
+    return (
+      expense.title.includes(deferred.value) ||
+      expense.category.includes(deferred.value) ||
+      expense.notes.includes(deferred.value)
+    )
   }),
 )
 
 function typeIcon(value: CostType) {
   if (value === 'AREA') return 'bounding-box'
   if (value === 'EQUAL') return 'grid-3x2'
-  if (value === 'WATER') return 'droplet'
   if (value === 'PERSON') return 'people'
-  if (value === 'UNIT') return 'house-door'
-  return 'speedometer2'
+  return 'house-door'
 }
 
 function typeLabel(type: CostType) {
@@ -47,7 +51,7 @@ function typeLabel(type: CostType) {
 function typeClass(type: CostType) {
   if (type === 'AREA') return ''
   if (type === 'EQUAL') return 'muted'
-  if (type === 'WATER' || type === 'PERSON') return 'accent'
+  if (type === 'PERSON') return 'accent'
   return 'ok'
 }
 
@@ -70,11 +74,26 @@ async function onRemove(id: string) {
       class="field"
       type="search"
       :value="query"
-      placeholder="جستجوی عنوان یا یادداشت"
+      placeholder="جستجوی دسته، عنوان یا یادداشت"
       @input="query = ($event.target as HTMLInputElement).value; applyQuery(query)"
     />
   </div>
 
+  <label class="form-label">دسته‌بندی</label>
+  <div class="quick-tags mb-2">
+    <button type="button" :class="{ active: categoryFilter === 'ALL' }" @click="categoryFilter = 'ALL'">همه</button>
+    <button
+      v-for="item in store.expenseCategories"
+      :key="item"
+      type="button"
+      :class="{ active: categoryFilter === item }"
+      @click="categoryFilter = item"
+    >
+      {{ item }}
+    </button>
+  </div>
+
+  <label class="form-label">نوع تقسیم</label>
   <div class="quick-tags mb-3">
     <button type="button" :class="{ active: filter === 'ALL' }" @click="filter = 'ALL'">همه</button>
     <button
@@ -101,12 +120,16 @@ async function onRemove(id: string) {
     <div class="d-flex justify-content-between gap-2">
       <button class="expense-open" type="button" @click="router.push(`/expenses/${expense.id}`)">
         <div class="d-flex flex-wrap gap-1">
+          <span class="chip accent">{{ expense.category }}</span>
           <span class="chip" :class="typeClass(expense.type)">
             <AppIcon :name="typeIcon(expense.type)" size="sm" />
             {{ typeLabel(expense.type) }}
           </span>
           <span class="chip" :class="expense.nature === 'CAPITAL' ? 'accent' : 'ok'">
             {{ natureLabel(expense.nature) }}
+          </span>
+          <span v-if="expense.parkingScope !== 'ALL'" class="chip muted">
+            {{ parkingScopeLabel(expense.parkingScope) }}
           </span>
         </div>
         <h3 class="h6 mt-2 mb-1">{{ expense.title }}</h3>

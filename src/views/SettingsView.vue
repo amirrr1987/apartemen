@@ -1,26 +1,18 @@
 <script setup lang="ts">
 import { useClipboard, useFileDialog } from '@vueuse/core'
+import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
+import { parkingLabel } from '../data/defaults'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
+const router = useRouter()
 const { notify } = useToast()
 const { confirm } = useConfirm()
 const { copy } = useClipboard()
 const { open, onChange } = useFileDialog({ accept: 'application/json', multiple: false })
-
-function syncWater(which: 'equal' | 'person', value: number) {
-  const n = Math.min(100, Math.max(0, Math.round(value)))
-  if (which === 'equal') {
-    store.state.settings.waterEqualPercent = n
-    store.state.settings.waterPersonPercent = 100 - n
-  } else {
-    store.state.settings.waterPersonPercent = n
-    store.state.settings.waterEqualPercent = 100 - n
-  }
-}
 
 function onManagerFee() {
   if (store.state.settings.managerFee <= 0) {
@@ -58,9 +50,19 @@ onChange(async (files) => {
 })
 
 async function onReset() {
-  if (!(await confirm('همه هزینه‌ها و پرداخت‌ها پاک شود؟ واحدها به حالت اولیه برمی‌گردند.'))) return
+  if (!(await confirm('همه داده‌ها پاک شود و تعریف اولیه از نو انجام شود؟'))) return
   store.resetAll()
   notify('اطلاعات بازنشانی شد')
+  void router.replace('/setup')
+}
+
+async function onRemoveUnit(id: number) {
+  if (!(await confirm('این واحد حذف شود؟'))) return
+  if (!store.removeUnit(id)) {
+    notify('حداقل یک واحد باید باقی بماند')
+    return
+  }
+  notify('واحد حذف شد')
 }
 </script>
 
@@ -68,19 +70,30 @@ async function onReset() {
   <label class="form-label">نام ساختمان</label>
   <input v-model="store.state.settings.buildingName" class="field mb-3" type="text" />
 
-  <label class="form-label">
-    آب بدون کنتور: {{ store.state.settings.waterEqualPercent.toLocaleString('fa-IR') }}٪ مساوی
-    +
-    {{ store.state.settings.waterPersonPercent.toLocaleString('fa-IR') }}٪ نفری
-  </label>
-  <input
-    class="form-range mb-3"
-    type="range"
-    min="0"
-    max="100"
-    :value="store.state.settings.waterEqualPercent"
-    @input="syncWater('equal', Number(($event.target as HTMLInputElement).value))"
-  />
+  <div class="d-flex justify-content-between align-items-center mb-2">
+    <label class="form-label mb-0">واحدها ({{ store.state.units.length.toLocaleString('fa-IR') }})</label>
+    <button class="ghost-btn py-1 px-2" type="button" @click="store.addUnit()">
+      <AppIcon name="plus-lg" size="sm" />
+      واحد جدید
+    </button>
+  </div>
+  <div class="panel mb-3">
+    <div v-for="unit in store.state.units" :key="unit.id" class="d-flex justify-content-between align-items-center gap-2 mb-2">
+      <button class="text-start flex-grow-1 border-0 bg-transparent p-0" type="button" @click="router.push(`/units/${unit.id}`)">
+        <strong>{{ unit.name }}</strong>
+        <small class="d-block text-muted">{{ unit.area }} متر · {{ parkingLabel(unit) }}</small>
+      </button>
+      <button
+        v-if="store.state.units.length > 1"
+        class="ghost-btn icon-action"
+        type="button"
+        aria-label="حذف"
+        @click="onRemoveUnit(unit.id)"
+      >
+        <AppIcon name="trash" size="sm" />
+      </button>
+    </div>
+  </div>
 
   <label class="form-label">حق‌الزحمه مصوب مدیر (تومان)</label>
   <input
@@ -97,6 +110,10 @@ async function onReset() {
   </button>
 
   <div class="d-grid gap-2">
+    <button class="ghost-btn" type="button" @click="router.push('/setup')">
+      <AppIcon name="gear-wide-connected" size="sm" />
+      ویرایش تعریف اولیه
+    </button>
     <button class="primary-btn" type="button" @click="onExport">
       <AppIcon name="download" size="sm" />
       دانلود پشتیبان

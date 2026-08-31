@@ -5,10 +5,22 @@ import AppIcon from '../components/AppIcon.vue'
 import InfoTip from '../components/InfoTip.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
-import { COST_NATURES, COST_TYPES, inferNature, natureLabel, payerFor, partyLabel } from '../data/defaults'
+import {
+  COST_NATURES,
+  COST_TYPES,
+  PARKING_SCOPES,
+  catalogItemsForCategory,
+  inferNature,
+  inferParkingScope,
+  natureLabel,
+  payerFor,
+  partyLabel,
+  parkingScopeLabel,
+} from '../data/defaults'
+import type { ExpenseCatalogItem } from '../data/defaults'
 import { amountInWords, formatToman, parseAmount } from '../lib/format'
 import { useAppStore } from '../stores/app'
-import type { CostNature, CostType } from '../types'
+import type { CostNature, CostType, ParkingScope } from '../types'
 
 const store = useAppStore()
 const route = useRoute()
@@ -24,44 +36,31 @@ const isEdit = computed(() => Boolean(existing.value))
 
 const type = ref<CostType>('AREA')
 const nature = ref<CostNature>('CURRENT')
+const parkingScope = ref<ParkingScope>('ALL')
+const category = ref(store.expenseCategories[0] ?? 'موتورخانه')
 const title = ref('')
 const amountText = ref('')
 const notes = ref('')
 const unitId = ref(store.state.units[0]?.id ?? 1)
-const meters = ref<Record<number, string>>(
-  Object.fromEntries(store.state.units.map((unit) => [unit.id, ''])),
-)
 
 function hydrate() {
   const expense = existing.value
   type.value = expense?.type ?? 'AREA'
   nature.value = expense?.nature ?? 'CURRENT'
+  parkingScope.value = expense?.parkingScope ?? 'ALL'
+  category.value = expense?.category ?? store.expenseCategories[0] ?? 'موتورخانه'
   title.value = expense?.title ?? ''
   amountText.value = expense ? String(expense.amount) : ''
   notes.value = expense?.notes ?? ''
   unitId.value = expense?.unitId ?? store.state.units[0]?.id ?? 1
-  meters.value = Object.fromEntries(
-    store.state.units.map((unit) => [
-      unit.id,
-      expense?.meters?.[unit.id] != null ? String(expense.meters[unit.id]) : '',
-    ]),
-  )
 }
 
 onMounted(hydrate)
 watch(expenseId, hydrate)
 
-const selectedType = computed(() => COST_TYPES.find((item) => item.value === type.value)!)
+const titleSuggestions = computed(() => catalogItemsForCategory(category.value))
 const amount = computed(() => parseAmount(amountText.value))
 const words = computed(() => amountInWords(amount.value))
-
-const meterValues = computed(() => {
-  const result: Record<number, number> = {}
-  for (const unit of store.state.units) {
-    result[unit.id] = parseAmount(meters.value[unit.id] ?? '')
-  }
-  return result
-})
 
 const split = computed(() => {
   if (amount.value <= 0) return null
@@ -70,39 +69,54 @@ const split = computed(() => {
     type: type.value,
     nature: nature.value,
     unitId: type.value === 'UNIT' ? unitId.value : undefined,
-    meters: type.value === 'METER' ? meterValues.value : undefined,
+    parkingScope: type.value === 'UNIT' ? 'ALL' : parkingScope.value,
+    category: category.value,
+    title: title.value,
   })
 })
 
-const canSave = computed(() => title.value.trim().length > 0 && amount.value > 0)
+const canSave = computed(() => category.value.trim().length > 0 && title.value.trim().length > 0 && amount.value > 0)
 
 watch(type, (next) => {
   if (isEdit.value) return
   nature.value = inferNature(title.value, next)
 })
 
-function useExample(example: { title: string; nature: CostNature }) {
-  title.value = example.title
-  nature.value = example.nature
+watch(title, (next) => {
+  if (isEdit.value || type.value === 'UNIT') return
+  parkingScope.value = inferParkingScope(next)
+})
+
+function selectCategory(next: string) {
+  category.value = next
+  if (!isEdit.value && !titleSuggestions.value.some((item) => item.title === title.value)) {
+    title.value = ''
+  }
+}
+
+function useCatalogItem(item: ExpenseCatalogItem) {
+  title.value = item.title
+  type.value = item.type
+  nature.value = item.nature
+  if (item.parkingScope) parkingScope.value = item.parkingScope
 }
 
 function typeIcon(value: CostType) {
   if (value === 'AREA') return 'bounding-box'
   if (value === 'EQUAL') return 'grid-3x2'
-  if (value === 'WATER') return 'droplet'
   if (value === 'PERSON') return 'people'
-  if (value === 'UNIT') return 'house-door'
-  return 'speedometer2'
+  return 'house-door'
 }
 
 function payload() {
   return {
+    category: category.value,
     title: title.value,
     amount: amount.value,
     type: type.value,
     nature: nature.value,
     unitId: type.value === 'UNIT' ? unitId.value : undefined,
-    meters: type.value === 'METER' ? meterValues.value : undefined,
+    parkingScope: type.value === 'UNIT' ? 'ALL' : parkingScope.value,
     notes: notes.value,
   }
 }
@@ -130,12 +144,40 @@ async function onDelete() {
 
 <template>
   <p class="note info mb-3">
-    اول نوع تقسیم را انتخاب کنید، بعد مبلغ را بزنید. پیش‌نمایش سهم هر واحد پایین فرم می‌آید.
+    ابتدا دسته‌بندی و عنوان را از لیست انتخاب کنید، سپس نوع تقسیم و مبلغ را وارد کنید.
   </p>
+
+  <label class="form-label">دسته‌بندی</label>
+  <div class="quick-tags mb-3">
+    <button
+      v-for="item in store.expenseCategories"
+      :key="item"
+      type="button"
+      class="category-tag"
+      :class="{ active: category === item }"
+      @click="selectCategory(item)"
+    >
+      {{ item }}
+    </button>
+  </div>
+
+  <label class="form-label">عنوان</label>
+  <div v-if="titleSuggestions.length" class="quick-tags mb-2">
+    <button
+      v-for="item in titleSuggestions"
+      :key="item.title"
+      type="button"
+      :class="{ active: title === item.title }"
+      @click="useCatalogItem(item)"
+    >
+      {{ item.title }}
+    </button>
+  </div>
+  <input v-model="title" class="field mb-3" type="text" placeholder="یا عنوان دلخواه بنویسید" />
 
   <div class="d-flex align-items-center gap-2 mb-2">
     <label class="form-label mb-0">نوع تقسیم بین واحدها</label>
-    <InfoTip text="این انتخاب فقط بین واحدها تقسیم می‌کند، نه بین مالک و مستأجر." />
+    <InfoTip text="مبنای قانونی: متراژی (ماده ۴)، مساوی برای هزینه‌های غیرمرتبط با متراژ، نفری برای مصرف." />
   </div>
   <div class="type-grid mb-3">
     <button
@@ -168,13 +210,23 @@ async function onDelete() {
     </button>
   </div>
 
-  <label class="form-label">عنوان</label>
-  <input v-model="title" class="field mb-2" type="text" placeholder="مثلاً گاز موتورخانه" />
-  <div class="quick-tags mb-3">
-    <button v-for="example in selectedType.examples" :key="example.title" type="button" @click="useExample(example)">
-      {{ example.title }}
-    </button>
-  </div>
+  <template v-if="type !== 'UNIT'">
+    <label class="form-label">مشمولیت پارکینگ</label>
+    <div class="type-grid mb-3">
+      <button
+        v-for="item in PARKING_SCOPES"
+        :key="item.value"
+        class="type-btn"
+        :class="{ active: parkingScope === item.value }"
+        type="button"
+        @click="parkingScope = item.value"
+      >
+        <AppIcon :name="item.value === 'WITH_PARKING' ? 'car-front' : item.value === 'WITHOUT_PARKING' ? 'car-front-fill' : 'buildings'" />
+        <strong>{{ item.label }}</strong>
+        <small>{{ item.hint }}</small>
+      </button>
+    </div>
+  </template>
 
   <label class="form-label">مبلغ (تومان)</label>
   <input v-model="amountText" class="field" inputmode="numeric" placeholder="مثلاً ۱۲۰۰۰۰۰" />
@@ -188,19 +240,14 @@ async function onDelete() {
     </select>
   </div>
 
-  <div v-if="type === 'METER'" class="mb-3">
-    <label class="form-label">عدد کنتور هر واحد</label>
-    <div v-for="unit in store.state.units" :key="unit.id" class="d-flex align-items-center gap-2 mb-2">
-      <span class="flex-grow-1">{{ unit.name }}</span>
-      <input v-model="meters[unit.id]" class="field" style="max-width: 140px" inputmode="decimal" />
-    </div>
-  </div>
-
   <label class="form-label">یادداشت (اختیاری)</label>
   <textarea v-model="notes" class="field mb-3" rows="2" />
 
   <div v-if="split" class="panel mb-3">
-    <strong class="d-block mb-2">پیش‌نمایش سهم واحدها · {{ natureLabel(nature) }}</strong>
+    <strong class="d-block mb-2">
+      پیش‌نمایش · {{ category }} · {{ natureLabel(nature) }}
+      <span v-if="type !== 'UNIT'" class="text-muted"> · {{ parkingScopeLabel(parkingScope) }}</span>
+    </strong>
     <div v-for="unit in store.state.units" :key="unit.id" class="split-row">
       <span>
         {{ unit.name }}
@@ -219,3 +266,11 @@ async function onDelete() {
     حذف هزینه
   </button>
 </template>
+
+<style scoped>
+.category-tag.active {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  border-color: var(--primary);
+}
+</style>

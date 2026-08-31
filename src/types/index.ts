@@ -1,6 +1,7 @@
-export type CostType = 'AREA' | 'EQUAL' | 'PERSON' | 'WATER' | 'UNIT' | 'METER'
+export type CostType = 'AREA' | 'EQUAL' | 'PERSON' | 'UNIT'
 export type CostNature = 'CURRENT' | 'CAPITAL'
 export type PartyRole = 'OWNER' | 'TENANT'
+export type ParkingScope = 'ALL' | 'WITH_PARKING' | 'WITHOUT_PARKING'
 export type TabId = 'home' | 'expenses' | 'payments' | 'report' | 'settings' | 'guide'
 
 export interface Unit {
@@ -8,6 +9,7 @@ export interface Unit {
   name: string
   area: number
   residents: number
+  hasParking: boolean
   owner: string
   tenant: string
   currentPayer: PartyRole
@@ -17,13 +19,14 @@ export interface Unit {
 
 export interface Expense {
   id: string
+  category: string
   title: string
   amount: number
   type: CostType
   nature: CostNature
   period: string
   unitId?: number
-  meters?: Record<number, number>
+  parkingScope: ParkingScope
   notes: string
   createdAt: string
 }
@@ -39,9 +42,9 @@ export interface Payment {
 
 export interface Settings {
   buildingName: string
-  waterEqualPercent: number
-  waterPersonPercent: number
   managerFee: number
+  setupComplete: boolean
+  expenseCategories: string[]
 }
 
 export interface AppState {

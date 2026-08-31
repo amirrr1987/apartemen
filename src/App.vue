@@ -44,9 +44,10 @@ watch(message, async (value) => {
 
 const title = computed(() => store.state.settings.buildingName || 'ساختمان')
 const isLogin = computed(() => route.name === 'login')
-const showFab = computed(() => !isLogin.value && route.meta.fab === true)
-const showBack = computed(() => !isLogin.value && ['expense-new', 'expense-edit', 'unit'].includes(String(route.name)))
-const showPeriod = computed(() => !isLogin.value && route.name !== 'guide' && route.name !== 'settings')
+const isSetup = computed(() => route.name === 'setup')
+const showFab = computed(() => !isLogin.value && !isSetup.value && route.meta.fab === true)
+const showBack = computed(() => !isLogin.value && !isSetup.value && ['expense-new', 'expense-edit', 'unit'].includes(String(route.name)))
+const showPeriod = computed(() => !isLogin.value && !isSetup.value && route.name !== 'guide' && route.name !== 'settings')
 
 const tabs = [
   { to: '/', name: 'home', icon: 'house', iconActive: 'house-fill', label: 'خانه' },
@@ -81,7 +82,7 @@ function onLogout() {
 </script>
 
 <template>
-  <RouterView v-if="isLogin" />
+  <RouterView v-if="isLogin || isSetup" />
 
   <div v-else-if="!store.ready" class="db-loading">
     <p>در حال بارگذاری از پایگاه داده…</p>

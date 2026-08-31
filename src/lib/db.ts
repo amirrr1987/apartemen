@@ -1,9 +1,9 @@
 import { createClient, type Client } from '@libsql/client/web'
-import { createDefaultState } from '../data/defaults'
+import { createDefaultState, inferCategory } from '../data/defaults'
 import { currentPeriod } from './jalali'
-import { SCHEMA_STATEMENTS } from './schema'
+import { SCHEMA_MIGRATIONS, SCHEMA_STATEMENTS } from './schema'
 import { normalizeTursoToken } from './turso-token'
-import type { AppState, Expense, Payment, Unit } from '../types'
+import type { AppState, CostType, Expense, Payment, Unit } from '../types'
 
 let client: Client | null = null
 
@@ -34,6 +34,19 @@ export async function initSchema(db: Client = getDbClient()): Promise<void> {
   for (const sql of SCHEMA_STATEMENTS) {
     await db.execute(sql)
   }
+  for (const sql of SCHEMA_MIGRATIONS) {
+    try {
+      await db.execute(sql)
+    } catch {
+      // column may already exist
+    }
+  }
+}
+
+function migrateCostType(type: string): CostType {
+  if (type === 'WATER') return 'PERSON'
+  if (type === 'METER') return 'UNIT'
+  return type as CostType
 }
 
 function rowUnit(row: Record<string, unknown>): Unit {
@@ -42,6 +55,7 @@ function rowUnit(row: Record<string, unknown>): Unit {
     name: String(row.name),
     area: Number(row.area),
     residents: Number(row.residents),
+    hasParking: Boolean(Number(row.has_parking ?? 0)),
     owner: String(row.owner ?? ''),
     tenant: String(row.tenant ?? ''),
     currentPayer: (row.current_payer as Unit['currentPayer']) ?? 'TENANT',
@@ -51,16 +65,17 @@ function rowUnit(row: Record<string, unknown>): Unit {
 }
 
 function rowExpense(row: Record<string, unknown>): Expense {
-  const metersRaw = row.meters_json
+  const title = String(row.title)
   return {
     id: String(row.id),
-    title: String(row.title),
+    category: String(row.category ?? inferCategory(title)),
+    title,
     amount: Number(row.amount),
-    type: row.type as Expense['type'],
+    type: migrateCostType(String(row.type)),
     nature: row.nature as Expense['nature'],
     period: String(row.period),
     unitId: row.unit_id == null ? undefined : Number(row.unit_id),
-    meters: metersRaw ? (JSON.parse(String(metersRaw)) as Record<number, number>) : undefined,
+    parkingScope: (row.parking_scope as Expense['parkingScope']) ?? 'ALL',
     notes: String(row.notes ?? ''),
     createdAt: String(row.created_at),
   }
@@ -88,11 +103,15 @@ export async function loadAppState(db: Client = getDbClient()): Promise<AppState
     db.execute("SELECT value FROM meta WHERE key = 'current_period'"),
   ])
 
+  const settingsRow = settingsRes.rows[0]
+  const setupComplete = Boolean(Number(settingsRow?.setup_complete ?? 0))
   const hasData =
-    unitsRes.rows.length > 0 || expensesRes.rows.length > 0 || paymentsRes.rows.length > 0
+    setupComplete ||
+    unitsRes.rows.length > 0 ||
+    expensesRes.rows.length > 0 ||
+    paymentsRes.rows.length > 0
   if (!hasData) return null
 
-  const settingsRow = settingsRes.rows[0]
   const currentPeriodRow = metaRes.rows[0]
 
   return {
@@ -101,10 +120,10 @@ export async function loadAppState(db: Client = getDbClient()): Promise<AppState
     payments: paymentsRes.rows.map((row) => rowPayment(row as Record<string, unknown>)),
     settings: settingsRow
       ? {
-          buildingName: String(settingsRow.building_name),
-          waterEqualPercent: Number(settingsRow.water_equal_percent),
-          waterPersonPercent: Number(settingsRow.water_person_percent),
-          managerFee: Number(settingsRow.manager_fee),
+          buildingName: String(settingsRow.building_name ?? ''),
+          managerFee: Number(settingsRow.manager_fee ?? 0),
+          setupComplete,
+          expenseCategories: JSON.parse(String(settingsRow.expense_categories_json ?? '[]')) as string[],
         }
       : createDefaultState().settings,
     currentPeriod: currentPeriodRow ? String(currentPeriodRow.value) : currentPeriod(),
@@ -118,15 +137,15 @@ export async function saveAppState(state: AppState, db: Client = getDbClient()):
     {
       sql: `UPDATE settings SET
         building_name = ?,
-        water_equal_percent = ?,
-        water_person_percent = ?,
-        manager_fee = ?
+        manager_fee = ?,
+        setup_complete = ?,
+        expense_categories_json = ?
       WHERE id = 1`,
       args: [
         state.settings.buildingName,
-        state.settings.waterEqualPercent,
-        state.settings.waterPersonPercent,
         state.settings.managerFee,
+        state.settings.setupComplete ? 1 : 0,
+        JSON.stringify(state.settings.expenseCategories),
       ] as (string | number)[],
     },
     { sql: 'DELETE FROM units', args: [] as (string | number)[] },
@@ -139,13 +158,14 @@ export async function saveAppState(state: AppState, db: Client = getDbClient()):
     },
     ...state.units.map((unit) => ({
       sql: `INSERT INTO units (
-        id, name, area, residents, owner, tenant, current_payer, capital_payer, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, name, area, residents, has_parking, owner, tenant, current_payer, capital_payer, notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         unit.id,
         unit.name,
         unit.area,
         unit.residents,
+        unit.hasParking ? 1 : 0,
         unit.owner,
         unit.tenant,
         unit.currentPayer,
@@ -155,8 +175,8 @@ export async function saveAppState(state: AppState, db: Client = getDbClient()):
     })),
     ...state.expenses.map((expense) => ({
       sql: `INSERT INTO expenses (
-        id, title, amount, type, nature, period, unit_id, meters_json, notes, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, title, amount, type, nature, period, unit_id, parking_scope, category, notes, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         expense.id,
         expense.title,
@@ -165,7 +185,8 @@ export async function saveAppState(state: AppState, db: Client = getDbClient()):
         expense.nature,
         expense.period,
         expense.unitId ?? null,
-        expense.meters ? JSON.stringify(expense.meters) : null,
+        expense.parkingScope,
+        expense.category,
         expense.notes,
         expense.createdAt,
       ] as (string | number | null)[],
@@ -185,9 +206,4 @@ export async function saveAppState(state: AppState, db: Client = getDbClient()):
   ]
 
   await db.batch(stmts, 'write')
-}
-
-export async function seedDefaultUnits(db: Client = getDbClient()): Promise<void> {
-  const defaults = createDefaultState()
-  await saveAppState(defaults, db)
 }

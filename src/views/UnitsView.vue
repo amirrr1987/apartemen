@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { totalArea } from '../lib/calc'
-import { hasTenant, occupantLabel, partyLabel } from '../data/defaults'
+import { hasTenant, occupantLabel, parkingLabel, partyLabel } from '../data/defaults'
 import { formatMeter, formatPercent, formatToman } from '../lib/format'
 import { useAppStore } from '../stores/app'
 
@@ -38,7 +38,7 @@ const area = computed(() => totalArea(store.state.units))
       <span class="chip">{{ formatPercent(row.areaShare * 100) }}</span>
     </div>
     <small class="text-muted">
-      {{ formatMeter(row.unit.area) }} متر · {{ occupantLabel(row.unit) }}
+      {{ formatMeter(row.unit.area) }} متر · {{ occupantLabel(row.unit) }} · {{ parkingLabel(row.unit) }}
     </small>
     <small class="d-block text-muted">
       جاری: {{ hasTenant(row.unit) ? partyLabel(row.unit.currentPayer) : 'مالک' }}

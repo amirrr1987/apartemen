@@ -1,5 +1,5 @@
 import { inferNature, payerFor } from '../data/defaults'
-import type { AppState, Expense, Unit, UnitMonthSummary } from '../types'
+import type { AppState, Expense, ParkingScope, Unit, UnitMonthSummary } from '../types'
 
 export function totalArea(units: Unit[]): number {
   return units.reduce((sum, unit) => sum + unit.area, 0)
@@ -12,6 +12,12 @@ export function totalResidents(units: Unit[]): number {
 export function areaShare(unit: Unit, units: Unit[]): number {
   const total = totalArea(units)
   return total > 0 ? unit.area / total : 0
+}
+
+export function eligibleUnits(units: Unit[], parkingScope: ParkingScope): Unit[] {
+  if (parkingScope === 'WITH_PARKING') return units.filter((unit) => unit.hasParking)
+  if (parkingScope === 'WITHOUT_PARKING') return units.filter((unit) => !unit.hasParking)
+  return units
 }
 
 function splitRound(raw: number[], total: number): number[] {
@@ -34,66 +40,46 @@ function splitRound(raw: number[], total: number): number[] {
   return rounded
 }
 
-export function splitExpense(
-  expense: Expense,
-  units: Unit[],
-  waterEqualPercent: number,
-  waterPersonPercent: number,
-): Record<number, number> {
+export function splitExpense(expense: Expense, units: Unit[]): Record<number, number> {
   const result: Record<number, number> = {}
   units.forEach((unit) => {
     result[unit.id] = 0
   })
 
-  const count = units.length || 1
-  const area = totalArea(units)
-  const people = totalResidents(units)
+  const pool = eligibleUnits(units, expense.parkingScope)
+  if (!pool.length) return result
+
+  const count = pool.length
+  const area = totalArea(pool)
+  const people = totalResidents(pool)
 
   const assign = (ratios: number[]) => {
     const raw = ratios.map((ratio) => expense.amount * ratio)
     const rounded = splitRound(raw, expense.amount)
-    units.forEach((unit, i) => {
+    pool.forEach((unit, i) => {
       result[unit.id] = rounded[i] ?? 0
     })
   }
 
   switch (expense.type) {
     case 'AREA':
-      assign(units.map((unit) => (area > 0 ? unit.area / area : 1 / count)))
+      assign(pool.map((unit) => (area > 0 ? unit.area / area : 1 / count)))
       break
     case 'EQUAL':
-      assign(units.map(() => 1 / count))
+      assign(pool.map(() => 1 / count))
       break
     case 'PERSON':
       assign(
         people > 0
-          ? units.map((unit) => Math.max(0, unit.residents) / people)
-          : units.map(() => 1 / count),
+          ? pool.map((unit) => Math.max(0, unit.residents) / people)
+          : pool.map(() => 1 / count),
       )
       break
-    case 'WATER': {
-      const equalPart = waterEqualPercent / 100
-      const personPart = waterPersonPercent / 100
-      const personRatio =
-        people > 0
-          ? units.map((unit) => Math.max(0, unit.residents) / people)
-          : units.map(() => 1 / count)
-      assign(units.map((_, i) => equalPart / count + personPart * (personRatio[i] ?? 0)))
-      break
-    }
     case 'UNIT':
-      if (expense.unitId != null) result[expense.unitId] = Math.round(expense.amount)
+      if (expense.unitId != null && pool.some((unit) => unit.id === expense.unitId)) {
+        result[expense.unitId] = Math.round(expense.amount)
+      }
       break
-    case 'METER': {
-      const meters = expense.meters ?? {}
-      const sum = units.reduce((acc, unit) => acc + (meters[unit.id] ?? 0), 0)
-      assign(
-        sum > 0
-          ? units.map((unit) => (meters[unit.id] ?? 0) / sum)
-          : units.map(() => 1 / count),
-      )
-      break
-    }
   }
 
   return result
@@ -101,7 +87,6 @@ export function splitExpense(
 
 export function monthSummaries(state: AppState, period = state.currentPeriod): UnitMonthSummary[] {
   const expenses = state.expenses.filter((expense) => expense.period === period)
-  const { waterEqualPercent, waterPersonPercent } = state.settings
 
   return state.units.map((unit) => {
     const breakdown = expenses
@@ -109,8 +94,7 @@ export function monthSummaries(state: AppState, period = state.currentPeriod): U
         const nature = expense.nature ?? inferNature(expense.title, expense.type)
         return {
           expense: { ...expense, nature },
-          share:
-            splitExpense(expense, state.units, waterEqualPercent, waterPersonPercent)[unit.id] ?? 0,
+          share: splitExpense(expense, state.units)[unit.id] ?? 0,
           payer: payerFor(unit, nature),
         }
       })

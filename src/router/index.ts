@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useAppStore } from '../stores/app'
 import { useAuthStore } from '../stores/auth'
 import HomeView from '../views/HomeView.vue'
 import ExpensesView from '../views/ExpensesView.vue'
@@ -9,6 +10,7 @@ import UnitsView from '../views/UnitsView.vue'
 import UnitDetailView from '../views/UnitDetailView.vue'
 import GuideView from '../views/GuideView.vue'
 import SettingsView from '../views/SettingsView.vue'
+import SetupView from '../views/SetupView.vue'
 import TheLogin from '../views/TheLogin.vue'
 
 const router = createRouter({
@@ -18,6 +20,7 @@ const router = createRouter({
   },
   routes: [
     { path: '/login', name: 'login', component: TheLogin, meta: { title: 'ورود', public: true } },
+    { path: '/setup', name: 'setup', component: SetupView, meta: { title: 'تعریف اولیه', setup: true } },
     { path: '/', name: 'home', component: HomeView, meta: { fab: true, title: 'گزارش کلی' } },
     { path: '/expenses', name: 'expenses', component: ExpensesView, meta: { fab: true, title: 'هزینه‌ها' } },
     { path: '/expenses/new', name: 'expense-new', component: ExpenseFormView, meta: { title: 'هزینه جدید' } },
@@ -40,6 +43,11 @@ router.beforeEach((to) => {
   }
   if (!auth.isLoggedIn) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  const app = useAppStore()
+  if (app.ready && app.needsSetup && to.name !== 'setup') {
+    return { name: 'setup' }
   }
   return true
 })

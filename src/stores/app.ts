@@ -2,43 +2,71 @@ import { computed, reactive, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { useDebounceFn } from '@vueuse/core'
 import { monthSummaries, monthTotals, splitExpense } from '../lib/calc'
-import { createDefaultState, hasTenant, inferNature, partyLabel } from '../data/defaults'
+import { createDefaultState, createEmptyUnit, catalogCategoryLabels, hasTenant, inferCategory, inferNature, inferParkingScope, partyLabel, parkingLabel } from '../data/defaults'
 import { isDbConfigured, loadAppState, saveAppState } from '../lib/db'
 import { newId } from '../lib/format'
 import { currentPeriod } from '../lib/jalali'
-import type { AppState, CostNature, CostType, Expense, PartyRole, Unit } from '../types'
+import type { AppState, CostNature, CostType, Expense, ParkingScope, PartyRole, Unit } from '../types'
 
-const STORAGE_KEY = 'aparteman-v1'
+const STORAGE_KEY = 'aparteman-v2'
 
-function normalizeUnit(unit: Partial<Unit>, fallback: Unit): Unit {
+function migrateCostType(type: string): CostType {
+  if (type === 'WATER') return 'PERSON'
+  if (type === 'METER') return 'UNIT'
+  return type as CostType
+}
+
+function normalizeUnit(unit: Partial<Unit>): Unit {
+  const id = Number(unit.id) || 1
   return {
-    ...fallback,
+    ...createEmptyUnit(id, unit.name),
     ...unit,
+    id,
     tenant: unit.tenant ?? '',
+    hasParking: unit.hasParking ?? false,
     currentPayer: unit.currentPayer ?? 'TENANT',
     capitalPayer: unit.capitalPayer ?? 'OWNER',
   }
 }
 
-function normalizeExpense(expense: Expense): Expense {
+function normalizeExpense(expense: Partial<Expense> & Pick<Expense, 'id' | 'title' | 'amount' | 'period' | 'createdAt'>): Expense {
+  const type = migrateCostType(String(expense.type ?? 'AREA'))
   return {
-    ...expense,
-    nature: expense.nature ?? inferNature(expense.title, expense.type),
+    id: expense.id,
+    category: expense.category?.trim() || inferCategory(expense.title),
+    title: expense.title,
+    amount: expense.amount,
+    type,
+    nature: expense.nature ?? inferNature(expense.title, type),
+    period: expense.period,
+    unitId: expense.unitId,
+    parkingScope: expense.parkingScope ?? inferParkingScope(expense.title),
+    notes: expense.notes ?? '',
+    createdAt: expense.createdAt,
   }
 }
 
 function normalizeState(parsed: Partial<AppState>): AppState {
   const fallback = createDefaultState()
-  const sourceUnits = parsed.units?.length ? parsed.units : fallback.units
+  const legacySettings = parsed.settings as Partial<AppState['settings']> & {
+    waterEqualPercent?: number
+  }
+  const setupComplete =
+    parsed.settings?.setupComplete ??
+    Boolean(parsed.units?.length && legacySettings?.buildingName && legacySettings.buildingName !== 'ساختمان')
+
   return {
     ...fallback,
     ...parsed,
-    units: sourceUnits.map((unit, index) =>
-      normalizeUnit(unit, fallback.units[index] ?? fallback.units[0]!),
-    ),
-    expenses: (parsed.expenses ?? []).map(normalizeExpense),
+    units: (parsed.units ?? []).map((unit) => normalizeUnit(unit)),
+    expenses: (parsed.expenses ?? []).map((expense) => normalizeExpense(expense as Expense)),
     payments: parsed.payments ?? [],
-    settings: { ...fallback.settings, ...parsed.settings },
+    settings: {
+      buildingName: parsed.settings?.buildingName ?? fallback.settings.buildingName,
+      managerFee: parsed.settings?.managerFee ?? fallback.settings.managerFee,
+      setupComplete,
+      expenseCategories: parsed.settings?.expenseCategories ?? fallback.settings.expenseCategories,
+    },
     currentPeriod: parsed.currentPeriod || currentPeriod(),
   }
 }
@@ -93,10 +121,10 @@ export const useAppStore = defineStore('app', () => {
       } else {
         const local = loadLocalState()
         const hasLocalData =
+          local.settings.setupComplete ||
           local.expenses.length > 0 ||
           local.payments.length > 0 ||
-          local.settings.buildingName !== 'ساختمان' ||
-          local.settings.managerFee > 0
+          local.units.length > 0
         await saveAppState(hasLocalData ? local : createDefaultState())
         if (hasLocalData) applyState(local)
       }
@@ -141,28 +169,73 @@ export const useAppStore = defineStore('app', () => {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   )
 
+  const needsSetup = computed(() => !state.settings.setupComplete)
+
+  function completeSetup(input: {
+    buildingName: string
+    units: Unit[]
+    managerFee?: number
+  }) {
+    state.settings.buildingName = input.buildingName.trim()
+    state.settings.managerFee = Math.round(input.managerFee ?? 0)
+    state.settings.setupComplete = true
+    state.units = input.units.map((unit) => normalizeUnit(unit))
+  }
+
+  function addUnit() {
+    const id = state.units.reduce((max, unit) => Math.max(max, unit.id), 0) + 1
+    state.units.push(createEmptyUnit(id))
+    return id
+  }
+
+  function removeUnit(id: number) {
+    if (state.units.length <= 1) return false
+    state.units = state.units.filter((unit) => unit.id !== id)
+    state.expenses = state.expenses.filter((expense) => expense.unitId !== id)
+    state.payments = state.payments.filter((payment) => payment.unitId !== id)
+    return true
+  }
+
+  const expenseCategories = computed(() =>
+    catalogCategoryLabels([
+      ...state.settings.expenseCategories,
+      ...state.expenses.map((expense) => expense.category),
+    ]),
+  )
+
+  function rememberCategory(category: string) {
+    const trimmed = category.trim()
+    if (!trimmed || state.settings.expenseCategories.includes(trimmed)) return
+    if (catalogCategoryLabels().includes(trimmed)) return
+    state.settings.expenseCategories.push(trimmed)
+  }
+
   function setPeriod(period: string) {
     state.currentPeriod = period
   }
 
   function addExpense(input: {
+    category: string
     title: string
     amount: number
     type: CostType
     nature: CostNature
     unitId?: number
-    meters?: Record<number, number>
+    parkingScope?: ParkingScope
     notes?: string
   }): Expense {
+    const category = input.category.trim() || inferCategory(input.title)
+    rememberCategory(category)
     const expense: Expense = {
       id: newId(),
+      category,
       title: input.title.trim(),
       amount: Math.round(input.amount),
       type: input.type,
       nature: input.nature,
       period: state.currentPeriod,
       unitId: input.unitId,
-      meters: input.meters,
+      parkingScope: input.parkingScope ?? (input.type === 'UNIT' ? 'ALL' : inferParkingScope(input.title)),
       notes: input.notes?.trim() ?? '',
       createdAt: new Date().toISOString(),
     }
@@ -173,23 +246,28 @@ export const useAppStore = defineStore('app', () => {
   function updateExpense(
     id: string,
     input: {
+      category: string
       title: string
       amount: number
       type: CostType
       nature: CostNature
       unitId?: number
-      meters?: Record<number, number>
+      parkingScope?: ParkingScope
       notes?: string
     },
   ) {
     const expense = state.expenses.find((item) => item.id === id)
     if (!expense) return
+    const category = input.category.trim() || inferCategory(input.title)
+    rememberCategory(category)
+    expense.category = category
     expense.title = input.title.trim()
     expense.amount = Math.round(input.amount)
     expense.type = input.type
     expense.nature = input.nature
     expense.unitId = input.type === 'UNIT' ? input.unitId : undefined
-    expense.meters = input.type === 'METER' ? input.meters : undefined
+    expense.parkingScope =
+      input.type === 'UNIT' ? 'ALL' : (input.parkingScope ?? inferParkingScope(expense.title))
     expense.notes = input.notes?.trim() ?? ''
   }
 
@@ -197,23 +275,22 @@ export const useAppStore = defineStore('app', () => {
     state.expenses = state.expenses.filter((expense) => expense.id !== id)
   }
 
-  function previewSplit(expense: Pick<Expense, 'amount' | 'type' | 'unitId' | 'meters' | 'nature'>) {
+  function previewSplit(expense: Pick<Expense, 'amount' | 'type' | 'unitId' | 'parkingScope' | 'nature' | 'category' | 'title'>) {
     return splitExpense(
       {
         id: 'preview',
-        title: '',
+        category: expense.category ?? inferCategory(expense.title ?? ''),
+        title: expense.title ?? '',
         amount: expense.amount,
         type: expense.type,
         nature: expense.nature,
         period: state.currentPeriod,
         unitId: expense.unitId,
-        meters: expense.meters,
+        parkingScope: expense.parkingScope ?? 'ALL',
         notes: '',
         createdAt: '',
       },
       state.units,
-      state.settings.waterEqualPercent,
-      state.settings.waterPersonPercent,
     )
   }
 
@@ -288,6 +365,7 @@ export const useAppStore = defineStore('app', () => {
     )
     if (exists) return false
     addExpense({
+      category: 'حق‌الزحمه',
       title: 'حق‌الزحمه مدیر',
       amount,
       type: 'EQUAL',
@@ -322,6 +400,7 @@ export const useAppStore = defineStore('app', () => {
       'مستأجر',
       'مسئول پرداخت هزینه جاری',
       'مسئول پرداخت هزینه اساسی',
+      'پارکینگ',
       'متراژ',
       'سهم متراژ',
       'ساکنان',
@@ -341,6 +420,7 @@ export const useAppStore = defineStore('app', () => {
           row.unit.tenant,
           hasTenant(row.unit) ? partyLabel(row.unit.currentPayer) : 'مالک',
           partyLabel(row.unit.capitalPayer),
+          parkingLabel(row.unit),
           row.unit.area,
           (row.areaShare * 100).toFixed(2),
           row.unit.residents,
@@ -368,8 +448,13 @@ export const useAppStore = defineStore('app', () => {
     ready,
     syncing,
     dbError,
+    needsSetup,
+    expenseCategories,
     state,
     init,
+    completeSetup,
+    addUnit,
+    removeUnit,
     summaries,
     totals,
     periodExpenses,
