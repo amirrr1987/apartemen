@@ -12,6 +12,7 @@ import GuideView from '../views/GuideView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import SetupView from '../views/SetupView.vue'
 import TheLogin from '../views/TheLogin.vue'
+import RegisterView from '../views/RegisterView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -20,6 +21,7 @@ const router = createRouter({
   },
   routes: [
     { path: '/login', name: 'login', component: TheLogin, meta: { title: 'ورود', public: true } },
+    { path: '/register', name: 'register', component: RegisterView, meta: { title: 'ثبت‌نام', public: true } },
     { path: '/setup', name: 'setup', component: SetupView, meta: { title: 'تعریف اولیه', setup: true } },
     { path: '/', name: 'home', component: HomeView, meta: { fab: true, title: 'گزارش کلی' } },
     { path: '/expenses', name: 'expenses', component: ExpensesView, meta: { fab: true, title: 'هزینه‌ها' } },
@@ -38,7 +40,7 @@ const router = createRouter({
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.meta.public) {
-    if (to.name === 'login' && auth.isLoggedIn) return '/'
+    if ((to.name === 'login' || to.name === 'register') && auth.isLoggedIn) return '/'
     return true
   }
   if (!auth.isLoggedIn) {

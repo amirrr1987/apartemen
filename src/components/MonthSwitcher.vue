@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { useDrag } from '@vueuse/gesture'
-import { ref } from 'vue'
-import AppIcon from './AppIcon.vue'
-import { usePeriod } from '../composables/usePeriod'
+  import { useDrag } from '@vueuse/gesture'
+  import { ref } from 'vue'
+  import AppIcon from './AppIcon.vue'
+  import { usePeriod } from '../composables/usePeriod'
 
-const { label, shift } = usePeriod()
-const target = ref<HTMLElement | null>(null)
+  const { label, shift } = usePeriod()
+  const target = ref<HTMLElement | null>(null)
 
-useDrag(
-  ({ movement: [mx], last, canceled }) => {
-    if (!last || canceled) return
-    if (mx > 64) shift(-1)
-    if (mx < -64) shift(1)
-  },
-  { domTarget: target, axis: 'x', filterTaps: true },
-)
+  useDrag(
+    ({ movement: [mx], last, canceled }) => {
+      if (!last || canceled) return
+      if (mx > 64) shift(-1)
+      if (mx < -64) shift(1)
+    },
+    { domTarget: target, axis: 'x', filterTaps: true }
+  )
 </script>
 
 <template>

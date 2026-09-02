@@ -1,33 +1,37 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { RouterLink, useRoute, useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { useToast } from '../composables/useToast'
-import { canAuthenticate, useAuthStore } from '../stores/auth'
+import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
-const route = useRoute()
 const { notify } = useToast()
 
+const displayName = ref('')
 const username = ref('')
 const password = ref('')
+const confirmPassword = ref('')
 const submitting = ref(false)
 
 async function onSubmit() {
-  if (!canAuthenticate()) {
-    notify('هنوز کاربری ثبت نشده. ابتدا ثبت‌نام کنید.')
+  if (password.value !== confirmPassword.value) {
+    notify('رمز عبور و تکرار آن یکسان نیست')
     return
   }
+
   submitting.value = true
-  const ok = await auth.login(username.value, password.value)
+  const result = await auth.register(username.value, password.value, displayName.value)
   submitting.value = false
-  if (!ok) {
-    notify('نام کاربری یا رمز عبور اشتباه است')
+
+  if (!result.ok) {
+    notify(result.error)
     return
   }
-  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
-  void router.replace(redirect)
+
+  notify(`خوش آمدید ${result.displayName}`)
+  void router.replace('/')
 }
 </script>
 
@@ -37,12 +41,22 @@ async function onSubmit() {
       <div class="login-brand">
         <div class="brand-mark">ش</div>
         <div>
-          <h1>ورود به شارژ ساختمان</h1>
-          <p>برای دسترسی به اطلاعات، وارد شوید.</p>
+          <h1>ثبت‌نام</h1>
+          <p>حساب کاربری جدید بسازید و وارد شوید.</p>
         </div>
       </div>
 
       <form class="login-form" @submit.prevent="onSubmit">
+        <label class="form-label" for="displayName">نام نمایشی</label>
+        <input
+          id="displayName"
+          v-model="displayName"
+          class="field mb-3"
+          type="text"
+          autocomplete="name"
+          placeholder="مثلاً امیر رضایی"
+        />
+
         <label class="form-label" for="username">نام کاربری</label>
         <input
           id="username"
@@ -51,26 +65,39 @@ async function onSubmit() {
           type="text"
           autocomplete="username"
           required
+          minlength="3"
         />
 
         <label class="form-label" for="password">رمز عبور</label>
         <input
           id="password"
           v-model="password"
+          class="field mb-3"
+          type="password"
+          autocomplete="new-password"
+          required
+          minlength="4"
+        />
+
+        <label class="form-label" for="confirmPassword">تکرار رمز عبور</label>
+        <input
+          id="confirmPassword"
+          v-model="confirmPassword"
           class="field mb-4"
           type="password"
-          autocomplete="current-password"
+          autocomplete="new-password"
           required
+          minlength="4"
         />
 
         <button class="primary-btn w-100 mb-3" type="submit" :disabled="submitting">
-          <AppIcon name="box-arrow-in-left" size="sm" />
-          {{ submitting ? 'در حال ورود…' : 'ورود' }}
+          <AppIcon name="person-plus" size="sm" />
+          {{ submitting ? 'در حال ثبت‌نام…' : 'ثبت‌نام و ورود' }}
         </button>
 
         <p class="auth-switch">
-          حساب ندارید؟
-          <RouterLink to="/register">ثبت‌نام</RouterLink>
+          حساب دارید؟
+          <RouterLink to="/login">ورود</RouterLink>
         </p>
       </form>
     </div>
@@ -78,40 +105,6 @@ async function onSubmit() {
 </template>
 
 <style scoped>
-.login-screen {
-  display: grid;
-  place-items: center;
-  min-height: 100dvh;
-  padding: 24px 16px;
-}
-
-.login-card {
-  width: min(100%, 420px);
-  padding: 24px;
-}
-
-.login-brand {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 24px;
-}
-
-.login-brand h1 {
-  margin: 0 0 4px;
-  font-size: 1.15rem;
-}
-
-.login-brand p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.login-form {
-  margin: 0;
-}
-
 .auth-switch {
   margin: 0;
   text-align: center;

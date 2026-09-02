@@ -5,6 +5,7 @@ import { gsap } from 'gsap'
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import AppIcon from './components/AppIcon.vue'
+import AppMenu from './components/AppMenu.vue'
 import ConfirmDialog from './components/ConfirmDialog.vue'
 import MonthSwitcher from './components/MonthSwitcher.vue'
 import PWABadge from './components/PWABadge.vue'
@@ -13,6 +14,7 @@ import { usePwaInstall } from './composables/usePwaInstall'
 import { useToast } from './composables/useToast'
 import { useAppStore } from './stores/app'
 import { useAuthStore } from './stores/auth'
+import { drawerNav, isDrawerNavActive, isNavActive, primaryNav } from './lib/navigation'
 
 const store = useAppStore()
 const auth = useAuthStore()
@@ -23,7 +25,9 @@ const { message, notify } = useToast()
 const { canInstall, showIosTip, install } = usePwaInstall()
 const { start, done } = useNProgress()
 const pageRoot = ref<HTMLElement | null>(null)
+const mainRef = ref<HTMLElement | null>(null)
 const toastEl = ref<HTMLElement | null>(null)
+const menuOpen = ref(false)
 
 usePageEnter(pageRoot)
 
@@ -31,8 +35,11 @@ router.beforeEach(() => {
   start()
   return true
 })
-router.afterEach(() => {
+
+router.afterEach(async () => {
   done()
+  await nextTick()
+  mainRef.value?.focus({ preventScroll: true })
 })
 
 watch(message, async (value) => {
@@ -43,28 +50,13 @@ watch(message, async (value) => {
 })
 
 const title = computed(() => store.state.settings.buildingName || 'ساختمان')
-const isLogin = computed(() => route.name === 'login')
+const isAuthPage = computed(() => ['login', 'register'].includes(String(route.name)))
 const isSetup = computed(() => route.name === 'setup')
-const showFab = computed(() => !isLogin.value && !isSetup.value && route.meta.fab === true)
-const showBack = computed(() => !isLogin.value && !isSetup.value && ['expense-new', 'expense-edit', 'unit'].includes(String(route.name)))
-const showPeriod = computed(() => !isLogin.value && !isSetup.value && route.name !== 'guide' && route.name !== 'settings')
-
-const tabs = [
-  { to: '/', name: 'home', icon: 'house', iconActive: 'house-fill', label: 'خانه' },
-  { to: '/expenses', name: 'expenses', icon: 'receipt', iconActive: 'receipt', label: 'هزینه‌ها' },
-  { to: '/payments', name: 'payments', icon: 'wallet2', iconActive: 'wallet-fill', label: 'پرداخت‌ها' },
-  { to: '/report', name: 'report', icon: 'bar-chart', iconActive: 'bar-chart-fill', label: 'گزارش' },
-  { to: '/settings', name: 'settings', icon: 'gear', iconActive: 'gear-fill', label: 'تنظیمات' },
-  { to: '/guide', name: 'guide', icon: 'question-circle', iconActive: 'question-circle-fill', label: 'راهنما' },
-] as const
-
-function isTabActive(name: string) {
-  if (name === 'home') return route.name === 'home'
-  if (name === 'expenses') return String(route.name).startsWith('expense')
-  if (name === 'payments') return route.name === 'payments' || route.name === 'unit'
-  if (name === 'report') return route.name === 'report' || route.name === 'units'
-  return route.name === name
-}
+const showFab = computed(() => !isAuthPage.value && !isSetup.value && route.meta.fab === true)
+const showBack = computed(() => !isAuthPage.value && !isSetup.value && ['expense-new', 'expense-edit', 'unit'].includes(String(route.name)))
+const showPeriod = computed(() => !isAuthPage.value && !isSetup.value && route.name !== 'guide' && route.name !== 'settings')
+const menuUsername = computed(() => auth.currentUser?.displayName)
+const drawerPageActive = computed(() => isDrawerNavActive(route.name))
 
 async function installApp() {
   if (showIosTip.value && !canInstall.value) {
@@ -79,10 +71,18 @@ function onLogout() {
   auth.logout()
   void router.replace({ name: 'login' })
 }
+
+function toggleMenu() {
+  menuOpen.value = !menuOpen.value
+}
+
+function closeMenu() {
+  menuOpen.value = false
+}
 </script>
 
 <template>
-  <RouterView v-if="isLogin || isSetup" />
+  <RouterView v-if="isAuthPage || isSetup" />
 
   <div v-else-if="!store.ready" class="db-loading">
     <p>در حال بارگذاری از پایگاه داده…</p>
@@ -91,16 +91,21 @@ function onLogout() {
   <div class="screen" :class="{ 'has-fab': showFab }">
     <header class="topbar">
       <div class="brand">
-        <button v-if="showBack" class="icon-btn" type="button" aria-label="بازگشت" @click="router.back()">
+        <button
+          v-if="showBack"
+          class="icon-btn"
+          type="button"
+          aria-label="بازگشت"
+          @click="router.back()"
+        >
           <AppIcon name="chevron-right" />
         </button>
-        <div v-else class="brand-mark">ش</div>
         <div>
           <h1>{{ title }}</h1>
           <p>{{ (route.meta.title as string) || 'شارژ بر اساس قانون تملک آپارتمان‌ها' }}</p>
         </div>
       </div>
-      <div class="d-flex gap-2">
+      <div class="topbar-actions">
         <span v-if="store.syncing" class="chip muted">
           <AppIcon name="cloud-upload" size="sm" />
           ذخیره…
@@ -114,55 +119,44 @@ function onLogout() {
           آفلاین
         </span>
         <button
-          v-if="canInstall || showIosTip"
-          class="icon-btn"
+          class="icon-btn menu-trigger"
+          :class="{ active: menuOpen || drawerPageActive }"
           type="button"
-          aria-label="نصب برنامه"
-          title="نصب برنامه"
-          @click="installApp"
+          :aria-label="menuOpen ? 'بستن منو' : 'باز کردن منو'"
+          aria-haspopup="dialog"
+          :aria-expanded="menuOpen"
+          @click="toggleMenu"
         >
-          <AppIcon name="download" />
+          <AppIcon :name="menuOpen ? 'x-lg' : 'list'" />
         </button>
-        <div class="dropdown">
-          <button
-            class="icon-btn"
-            type="button"
-            data-bs-toggle="dropdown"
-            aria-expanded="false"
-            aria-label="منو"
-            title="منو"
-          >
-            <AppIcon name="three-dots-vertical" />
-          </button>
-          <ul class="dropdown-menu dropdown-menu-start">
-            <li>
-              <button class="dropdown-item d-flex align-items-center gap-2" type="button" @click="store.downloadCsv">
-                <AppIcon name="file-earmark-spreadsheet" size="sm" />
-                خروجی اکسل این ماه
-              </button>
-            </li>
-            <li v-if="canInstall || showIosTip">
-              <button class="dropdown-item d-flex align-items-center gap-2" type="button" @click="installApp">
-                <AppIcon name="download" size="sm" />
-                نصب روی دستگاه
-              </button>
-            </li>
-            <li>
-              <button class="dropdown-item d-flex align-items-center gap-2" type="button" @click="onLogout">
-                <AppIcon name="box-arrow-right" size="sm" />
-                خروج
-              </button>
-            </li>
-          </ul>
-        </div>
       </div>
     </header>
 
-    <MonthSwitcher v-if="showPeriod" />
+    <AppMenu
+      :open="menuOpen"
+      :items="drawerNav"
+      :username="menuUsername"
+      :building-name="title"
+      :can-install="canInstall"
+      :show-ios-tip="showIosTip"
+      @close="closeMenu"
+      @export-csv="store.downloadCsv"
+      @install="installApp"
+      @logout="onLogout"
+    />
 
-    <div ref="pageRoot">
-      <RouterView />
-    </div>
+    <main
+      id="main-content"
+      ref="mainRef"
+      class="main-content"
+      tabindex="-1"
+    >
+      <MonthSwitcher v-if="showPeriod" />
+
+      <div ref="pageRoot">
+        <RouterView />
+      </div>
+    </main>
   </div>
 
   <RouterLink v-if="showFab" class="fab" to="/expenses/new">
@@ -172,15 +166,19 @@ function onLogout() {
 
   <nav class="bottom-nav" aria-label="ناوبری اصلی">
     <RouterLink
-      v-for="tab in tabs"
+      v-for="tab in primaryNav"
       :key="tab.name"
       class="nav-item"
-      :class="{ active: isTabActive(tab.name) }"
+      :class="{ active: isNavActive(route.name, tab.name) }"
       :to="tab.to"
       :aria-label="tab.label"
-      :title="tab.label"
+      :aria-current="isNavActive(route.name, tab.name) ? 'page' : undefined"
     >
-      <AppIcon :name="isTabActive(tab.name) ? tab.iconActive : tab.icon" />
+      <AppIcon
+        :name="isNavActive(route.name, tab.name) ? tab.iconActive : tab.icon"
+        aria-hidden="true"
+        class="nav-item-icon"
+      />
       <span class="nav-label">{{ tab.label }}</span>
     </RouterLink>
   </nav>

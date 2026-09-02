@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { useConfirm } from '../composables/useConfirm'
-import AppIcon from './AppIcon.vue'
+  import { useConfirm } from '../composables/useConfirm'
+  import AppIcon from './AppIcon.vue'
 
-const { open, text, settle } = useConfirm()
+  const { open, text, settle } = useConfirm()
 </script>
 
 <template>

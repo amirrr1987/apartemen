@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { useToast } from '../composables/useToast'
 import { occupantLabel } from '../data/defaults'
@@ -27,7 +27,7 @@ function paidRatio(charge: number, remaining: number) {
 </script>
 
 <template>
-  <section class="panel hero mb-3">
+  <section class="panel hero mb-3 js-enter">
     <div class="hero-label">جمع شارژ این ماه</div>
     <div class="hero-amount">{{ formatToman(store.totals.charge) }} تومان</div>
     <div class="hero-sub">
@@ -43,11 +43,11 @@ function paidRatio(charge: number, remaining: number) {
     </div>
   </section>
 
-  <p class="note info mb-3">
+  <p class="note info mb-3 js-enter">
     مبنای قانونی شارژ، تناسب با مساحت اختصاصی است؛ مگر هزینه‌ای که به متراژ ربط ندارد یا مجمع روش دیگری تصویب کند.
   </p>
 
-  <div v-if="!store.summaries.some((row) => row.charge)" class="panel empty mb-3">
+  <div v-if="!store.summaries.some((row) => row.charge)" class="panel empty mb-3 js-enter">
     <p class="mb-2">هنوز هزینه‌ای برای این ماه ثبت نشده.</p>
     <RouterLink class="primary-btn" to="/expenses/new">
       <AppIcon name="plus-lg" size="sm" />
@@ -58,7 +58,7 @@ function paidRatio(charge: number, remaining: number) {
   <button
     v-for="row in store.summaries"
     :key="row.unit.id"
-    class="unit-row"
+    class="unit-row js-enter"
     type="button"
     @click="router.push(`/units/${row.unit.id}`)"
   >
