@@ -50,6 +50,7 @@ watch(message, async (value) => {
 })
 
 const title = computed(() => store.state.settings.buildingName || 'ساختمان')
+const pageTitle = computed(() => (route.meta.title as string) || 'شارژ ساختمان')
 const isAuthPage = computed(() => ['login', 'register'].includes(String(route.name)))
 const isSetup = computed(() => route.name === 'setup')
 const showFab = computed(() => !isAuthPage.value && !isSetup.value && route.meta.fab === true)
@@ -85,7 +86,7 @@ function closeMenu() {
   <RouterView v-if="isAuthPage || isSetup" />
 
   <div v-else-if="!store.ready" class="db-loading">
-    <p>در حال بارگذاری از پایگاه داده…</p>
+    <p>در حال بارگذاری…</p>
   </div>
   <template v-else>
   <div class="screen" :class="{ 'has-fab': showFab }">
@@ -101,8 +102,8 @@ function closeMenu() {
           <AppIcon name="chevron-right" />
         </button>
         <div>
-          <h1>{{ title }}</h1>
-          <p>{{ (route.meta.title as string) || 'شارژ بر اساس قانون تملک آپارتمان‌ها' }}</p>
+          <p class="brand-kicker">{{ title }}</p>
+          <h1>{{ pageTitle }}</h1>
         </div>
       </div>
       <div class="topbar-actions">
@@ -183,8 +184,9 @@ function closeMenu() {
     </RouterLink>
   </nav>
 
-  <ConfirmDialog />
   <PWABadge />
-  <div v-if="message" ref="toastEl" class="pwa-toast">{{ message }}</div>
   </template>
+
+  <ConfirmDialog />
+  <div v-if="message" ref="toastEl" class="pwa-toast" role="status">{{ message }}</div>
 </template>
