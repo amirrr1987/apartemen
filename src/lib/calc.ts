@@ -1,5 +1,6 @@
 import { inferNature, payerFor } from '../data/defaults'
-import type { AppState, Expense, ParkingScope, Unit, UnitMonthSummary } from '../types'
+import type { AppState, Expense, ParkingScope, Unit, UnitGuestStay, UnitMonthSummary } from '../types'
+import { daysInPeriod } from './jalali'
 
 export function totalArea(units: Unit[]): number {
   return units.reduce((sum, unit) => sum + unit.area, 0)
@@ -7,6 +8,20 @@ export function totalArea(units: Unit[]): number {
 
 export function totalResidents(units: Unit[]): number {
   return units.reduce((sum, unit) => sum + Math.max(0, unit.residents), 0)
+}
+
+export function guestNightsOf(unitId: number, period: string, stays: UnitGuestStay[]): number {
+  return stays.find((stay) => stay.unitId === unitId && stay.period === period)?.guestNights ?? 0
+}
+
+export function occupancyOf(unit: Pick<Unit, 'residents'>, guestNights: number, days: number): number {
+  const extra = days > 0 ? Math.max(0, guestNights) / days : 0
+  return Math.max(0, unit.residents) + extra
+}
+
+export function totalOccupancy(units: Unit[], period: string, stays: UnitGuestStay[]): number {
+  const days = daysInPeriod(period)
+  return units.reduce((sum, unit) => sum + occupancyOf(unit, guestNightsOf(unit.id, period, stays), days), 0)
 }
 
 export function areaShare(unit: Unit, units: Unit[]): number {
@@ -40,7 +55,11 @@ function splitRound(raw: number[], total: number): number[] {
   return rounded
 }
 
-export function splitExpense(expense: Expense, units: Unit[]): Record<number, number> {
+export function splitExpense(
+  expense: Expense,
+  units: Unit[],
+  options?: { period?: string; guestStays?: UnitGuestStay[] },
+): Record<number, number> {
   const result: Record<number, number> = {}
   units.forEach((unit) => {
     result[unit.id] = 0
@@ -51,7 +70,13 @@ export function splitExpense(expense: Expense, units: Unit[]): Record<number, nu
 
   const count = pool.length
   const area = totalArea(pool)
-  const people = totalResidents(pool)
+  const period = options?.period ?? expense.period
+  const stays = options?.guestStays ?? []
+  const days = daysInPeriod(period)
+  const people = pool.reduce(
+    (sum, unit) => sum + occupancyOf(unit, guestNightsOf(unit.id, period, stays), days),
+    0,
+  )
 
   const assign = (ratios: number[]) => {
     const raw = ratios.map((ratio) => expense.amount * ratio)
@@ -71,7 +96,7 @@ export function splitExpense(expense: Expense, units: Unit[]): Record<number, nu
     case 'PERSON':
       assign(
         people > 0
-          ? pool.map((unit) => Math.max(0, unit.residents) / people)
+          ? pool.map((unit) => occupancyOf(unit, guestNightsOf(unit.id, period, stays), days) / people)
           : pool.map(() => 1 / count),
       )
       break
@@ -87,14 +112,19 @@ export function splitExpense(expense: Expense, units: Unit[]): Record<number, nu
 
 export function monthSummaries(state: AppState, period = state.currentPeriod): UnitMonthSummary[] {
   const expenses = state.expenses.filter((expense) => expense.period === period)
+  const stays = state.guestStays ?? []
+  const days = daysInPeriod(period)
+  const people = totalOccupancy(state.units, period, stays)
 
   return state.units.map((unit) => {
+    const guestNights = guestNightsOf(unit.id, period, stays)
+    const occupancy = occupancyOf(unit, guestNights, days)
     const breakdown = expenses
       .map((expense) => {
         const nature = expense.nature ?? inferNature(expense.title, expense.type)
         return {
           expense: { ...expense, nature },
-          share: splitExpense(expense, state.units)[unit.id] ?? 0,
+          share: splitExpense(expense, state.units, { period, guestStays: stays })[unit.id] ?? 0,
           payer: payerFor(unit, nature),
         }
       })
@@ -141,6 +171,9 @@ export function monthSummaries(state: AppState, period = state.currentPeriod): U
     return {
       unit,
       areaShare: areaShare(unit, state.units),
+      guestNights,
+      occupancy,
+      occupancyShare: people > 0 ? occupancy / people : state.units.length > 0 ? 1 / state.units.length : 0,
       charge,
       currentCharge,
       capitalCharge,
