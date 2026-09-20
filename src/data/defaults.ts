@@ -9,7 +9,7 @@ export const COST_NATURES: { value: CostNature; label: string; hint: string }[] 
 export const COST_TYPES: { value: CostType; label: string; hint: string }[] = [
   { value: 'AREA', label: 'متراژی', hint: 'نسبت متراژ اختصاصی واحد به کل (اصل ماده ۴)' },
   { value: 'EQUAL', label: 'مساوی', hint: 'تقسیم یکسان بین واحدهای مشمول' },
-  { value: 'PERSON', label: 'نفری', hint: 'بر اساس تعداد ساکنان دائم' },
+  { value: 'PERSON', label: 'نفری', hint: 'ساکنان دائم به‌اضافه معادل نفری مهمان همان ماه' },
   { value: 'UNIT', label: 'اختصاصی', hint: 'فقط همان واحد پرداخت می‌کند' },
 ]
 
@@ -240,5 +240,6 @@ export function createDefaultState(): AppState {
       expenseCategories: [],
     },
     currentPeriod: currentPeriod(),
+    guestStays: [],
   }
 }

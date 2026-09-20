@@ -26,6 +26,10 @@ export function formatPercent(n: number): string {
   return `${digitsEnToFa(n.toLocaleString('en-US', { maximumFractionDigits: 2 }))}٪`
 }
 
+export function formatPeople(n: number): string {
+  return digitsEnToFa(n.toLocaleString('en-US', { maximumFractionDigits: 2 }))
+}
+
 export function amountInWords(n: number): string {
   const rounded = Math.round(Math.abs(n))
   if (rounded <= 0) return ''

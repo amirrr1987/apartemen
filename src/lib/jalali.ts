@@ -1,4 +1,4 @@
-import { addMonths, format, getMonth, getYear, setMonth, setYear, startOfMonth } from 'date-fns-jalali'
+import { addMonths, format, getDaysInMonth, getMonth, getYear, setMonth, setYear, startOfMonth } from 'date-fns-jalali'
 
 export function parsePeriod(period: string): { year: number; month: number } {
   const [year = 1400, month = 1] = period.split('-').map(Number)
@@ -21,6 +21,10 @@ export function currentPeriod(): string {
 
 export function periodLabel(period: string): string {
   return format(periodToDate(period), 'MMMM yyyy')
+}
+
+export function daysInPeriod(period: string): number {
+  return Math.max(1, getDaysInMonth(periodToDate(period)))
 }
 
 export function shiftPeriod(period: string, delta: number): string {

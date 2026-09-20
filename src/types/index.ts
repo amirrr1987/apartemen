@@ -40,6 +40,13 @@ export interface Payment {
   createdAt: string
 }
 
+/** نفرشب مهمان یک واحد در یک ماه شمسی */
+export interface UnitGuestStay {
+  unitId: number
+  period: string
+  guestNights: number
+}
+
 export interface Settings {
   buildingName: string
   managerFee: number
@@ -51,6 +58,7 @@ export interface AppState {
   units: Unit[]
   expenses: Expense[]
   payments: Payment[]
+  guestStays: UnitGuestStay[]
   settings: Settings
   currentPeriod: string
 }
@@ -58,6 +66,9 @@ export interface AppState {
 export interface UnitMonthSummary {
   unit: Unit
   areaShare: number
+  guestNights: number
+  occupancy: number
+  occupancyShare: number
   charge: number
   currentCharge: number
   capitalCharge: number

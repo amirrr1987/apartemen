@@ -43,6 +43,12 @@ export const SCHEMA_STATEMENTS = [
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS guest_stays (
+    unit_id INTEGER NOT NULL,
+    period TEXT NOT NULL,
+    guest_nights INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (unit_id, period)
+  )`,
   `INSERT OR IGNORE INTO settings (id) VALUES (1)`,
 ] as const
 
