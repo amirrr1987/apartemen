@@ -46,12 +46,17 @@ function sha256Bytes(data: Uint8Array): Uint8Array {
   view.setUint32(paddedLen - 4, bitLen)
 
   const w = new Int32Array(64)
+  const word = (i: number) => w[i] ?? 0
+  const round = (i: number) => k[i] ?? 0
+
   for (let offset = 0; offset < paddedLen; offset += 64) {
     for (let i = 0; i < 16; i++) w[i] = view.getInt32(offset + i * 4)
     for (let i = 16; i < 64; i++) {
-      const s0 = rotr(w[i - 15], 7) ^ rotr(w[i - 15], 18) ^ (w[i - 15] >>> 3)
-      const s1 = rotr(w[i - 2], 17) ^ rotr(w[i - 2], 19) ^ (w[i - 2] >>> 10)
-      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0
+      const w15 = word(i - 15)
+      const w2 = word(i - 2)
+      const s0 = rotr(w15, 7) ^ rotr(w15, 18) ^ (w15 >>> 3)
+      const s1 = rotr(w2, 17) ^ rotr(w2, 19) ^ (w2 >>> 10)
+      w[i] = (word(i - 16) + s0 + word(i - 7) + s1) | 0
     }
 
     let a = h0
@@ -66,7 +71,7 @@ function sha256Bytes(data: Uint8Array): Uint8Array {
     for (let i = 0; i < 64; i++) {
       const s1 = rotr(e, 6) ^ rotr(e, 11) ^ rotr(e, 25)
       const ch = (e & f) ^ (~e & g)
-      const t1 = (h + s1 + ch + k[i] + w[i]) | 0
+      const t1 = (h + s1 + ch + round(i) + word(i)) | 0
       const s0 = rotr(a, 2) ^ rotr(a, 13) ^ rotr(a, 22)
       const maj = (a & b) ^ (a & c) ^ (b & c)
       const t2 = (s0 + maj) | 0
