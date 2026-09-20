@@ -25,7 +25,7 @@ export const drawerNav: NavItem[] = [
     icon: 'buildings',
     iconActive: 'buildings-fill',
     label: 'واحدها',
-    description: 'لیست واحدها و جزئیات ساکنان',
+    description: 'لیست واحدها، ساکنان و مهمان همان ماه',
   },
   {
     to: '/settings',

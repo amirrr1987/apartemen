@@ -3,7 +3,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { useToast } from '../composables/useToast'
 import { occupantLabel } from '../data/defaults'
-import { formatMeter, formatPercent, formatToman } from '../lib/format'
+import { formatMeter, formatPercent, formatPeople, formatToman } from '../lib/format'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
@@ -44,7 +44,7 @@ function paidRatio(charge: number, remaining: number) {
   </section>
 
   <p class="note info mb-3 js-enter">
-    مبنای قانونی شارژ، تناسب با مساحت اختصاصی است؛ مگر هزینه‌ای که به متراژ ربط ندارد یا مجمع روش دیگری تصویب کند.
+    مبنای قانونی شارژ تناسب با مساحت اختصاصی است؛ مگر هزینه غیرمرتبط با متراژ، یا هزینه مصرفی نفری که مدیر با معادل مهمان حساب می‌کند.
   </p>
 
   <div v-if="!store.summaries.some((row) => row.charge)" class="panel empty mb-3 js-enter">
@@ -68,6 +68,8 @@ function paidRatio(charge: number, remaining: number) {
       <small>
         {{ formatMeter(row.unit.area) }} متر · سهم {{ formatPercent(row.areaShare * 100) }}
         · {{ occupantLabel(row.unit) }}
+        · {{ formatPeople(row.occupancy) }} نفر
+        <template v-if="row.guestNights > 0"> · {{ formatPeople(row.guestNights) }} نفرشب مهمان</template>
       </small>
       <div class="share-bar mt-2">
         <span :style="{ width: `${paidRatio(row.charge, row.remaining)}%` }" />

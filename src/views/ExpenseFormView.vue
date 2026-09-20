@@ -18,7 +18,7 @@ import {
   parkingScopeLabel,
 } from '../data/defaults'
 import type { ExpenseCatalogItem } from '../data/defaults'
-import { amountInWords, formatToman, parseAmount } from '../lib/format'
+import { amountInWords, formatPeople, formatToman, parseAmount } from '../lib/format'
 import { useAppStore } from '../stores/app'
 import type { CostNature, CostType, ParkingScope } from '../types'
 
@@ -177,7 +177,7 @@ async function onDelete() {
 
   <div class="d-flex align-items-center gap-2 mb-2">
     <label class="form-label mb-0">نوع تقسیم بین واحدها</label>
-    <InfoTip text="مبنای قانونی: متراژی (ماده ۴)، مساوی برای هزینه‌های غیرمرتبط با متراژ، نفری برای مصرف." />
+    <InfoTip text="مبنای قانونی: متراژی (ماده ۴)، مساوی برای هزینه‌های غیرمرتبط با متراژ، نفری برای مصرف با ساکنان دائم و معادل مهمان همان ماه." />
   </div>
   <div class="type-grid mb-3">
     <button
@@ -251,7 +251,12 @@ async function onDelete() {
     <div v-for="unit in store.state.units" :key="unit.id" class="split-row">
       <span>
         {{ unit.name }}
-        <small class="text-muted">({{ partyLabel(payerFor(unit, nature)) }})</small>
+        <small class="text-muted">
+          ({{ partyLabel(payerFor(unit, nature)) }}
+          <template v-if="type === 'PERSON'">
+            · {{ formatPeople(store.summaries.find((row) => row.unit.id === unit.id)?.occupancy ?? unit.residents) }} نفر
+          </template>)
+        </small>
       </span>
       <span>{{ formatToman(split[unit.id] ?? 0) }} تومان</span>
     </div>

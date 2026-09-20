@@ -5,8 +5,9 @@ import AppIcon from '../components/AppIcon.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
 import { COST_TYPES, hasTenant, natureLabel, partyLabel } from '../data/defaults'
-import { formatFaDate } from '../lib/jalali'
-import { formatPercent, formatToman, parseAmount } from '../lib/format'
+import { occupancyOf } from '../lib/calc'
+import { formatFaDate, daysInPeriod, periodLabel } from '../lib/jalali'
+import { formatPeople, formatPercent, formatToman, parseAmount, toFaDigits } from '../lib/format'
 import { useAppStore } from '../stores/app'
 import type { PartyRole, Payment } from '../types'
 
@@ -28,6 +29,7 @@ watch(unit, (value) => {
 const tab = ref<'pay' | 'split' | 'info'>('pay')
 
 const residentsText = ref(String(unit.value?.residents ?? 0))
+const guestNightsText = ref(String(store.guestNights(unitId.value)))
 const areaText = ref(String(unit.value?.area ?? 0))
 const owner = ref(unit.value?.owner ?? '')
 const tenant = ref(unit.value?.tenant ?? '')
@@ -41,10 +43,11 @@ const payParty = ref<'OWNER' | 'TENANT' | 'UNIT'>('OWNER')
 const editingPaymentId = ref<string | null>(null)
 
 watch(
-  unit,
-  (value) => {
+  () => [unit.value, store.state.currentPeriod] as const,
+  ([value]) => {
     if (!value) return
     residentsText.value = String(value.residents)
+    guestNightsText.value = String(store.guestNights(value.id))
     areaText.value = String(value.area)
     owner.value = value.owner
     tenant.value = value.tenant
@@ -56,6 +59,13 @@ watch(
   },
   { immediate: true },
 )
+
+const guestNightsDraft = computed(() => Math.max(0, Math.round(Number(guestNightsText.value.replace(/[^\d]/g, '')) || 0)))
+const occupancyDraft = computed(() => {
+  const residents = Math.max(0, Math.round(Number(residentsText.value.replace(/[^\d]/g, '')) || 0))
+  return occupancyOf({ residents }, guestNightsDraft.value, daysInPeriod(store.state.currentPeriod))
+})
+const guestEquivalentDraft = computed(() => occupancyDraft.value - Math.max(0, Math.round(Number(residentsText.value.replace(/[^\d]/g, '')) || 0)))
 
 function typeLabel(type: string) {
   return COST_TYPES.find((item) => item.value === type)?.label ?? type
@@ -115,6 +125,7 @@ async function onRemovePayment(id: string) {
 function saveUnit() {
   if (!unit.value) return
   unit.value.residents = Math.max(0, Math.round(Number(residentsText.value.replace(/[^\d]/g, '')) || 0))
+  store.setGuestNights(unit.value.id, guestNightsDraft.value)
   unit.value.area = Math.max(0, parseAmount(areaText.value))
   unit.value.owner = owner.value.trim()
   unit.value.tenant = tenant.value.trim()
@@ -156,6 +167,10 @@ function togglePaid(party?: PartyRole) {
       <div class="hero-sub">
         <span>سهم متراژ {{ formatPercent(summary.areaShare * 100) }}</span>
         <span>مانده {{ formatToman(summary.remaining) }}</span>
+      </div>
+      <div class="hero-sub">
+        <span>ساکن {{ toFaDigits(unit.residents) }}</span>
+        <span>معادل نفری {{ formatPeople(summary.occupancy) }}</span>
       </div>
     </section>
 
@@ -273,6 +288,16 @@ function togglePaid(party?: PartyRole) {
       <input v-model="areaText" class="field mb-3" inputmode="decimal" />
       <label class="form-label">تعداد ساکنان دائم</label>
       <input v-model="residentsText" class="field mb-3" inputmode="numeric" />
+      <label class="form-label">نفرشب مهمان {{ periodLabel(store.state.currentPeriod) }}</label>
+      <input v-model="guestNightsText" class="field" inputmode="numeric" placeholder="مثلاً ۲۰" />
+      <small class="text-muted d-block mb-3">
+        تعداد مهمان × تعداد شب؛ مثلاً ۲ مهمان ۱۰ شب = ۲۰.
+        معادل این ماه {{ formatPeople(occupancyDraft) }} نفر
+        <template v-if="guestNightsDraft > 0">
+          ({{ formatPeople(guestEquivalentDraft) }} مهمان)
+        </template>
+        . فقط روی هزینه نفری اثر دارد.
+      </small>
       <label class="form-check mb-3">
         <input v-model="hasParking" class="form-check-input" type="checkbox" />
         <span class="form-check-label">دارای حق استفاده از پارکینگ</span>

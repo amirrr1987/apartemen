@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { hasTenant, occupantLabel, partyLabel } from '../data/defaults'
-import { formatMeter, formatPercent, formatToman } from '../lib/format'
+import { formatMeter, formatPercent, formatPeople, formatToman } from '../lib/format'
 import { periodLabel } from '../lib/jalali'
 import { useAppStore } from '../stores/app'
 import { useToast } from '../composables/useToast'
@@ -98,7 +98,10 @@ function download() {
           >
             <td>
               <strong>{{ row.unit.name }}</strong>
-              <small class="d-block text-muted">{{ occupantLabel(row.unit) }}</small>
+              <small class="d-block text-muted">
+                {{ occupantLabel(row.unit) }}
+                · {{ formatPeople(row.occupancy) }} نفر
+              </small>
             </td>
             <td>{{ formatToman(row.charge) }}</td>
             <td>{{ formatToman(row.paid) }}</td>
@@ -121,6 +124,22 @@ function download() {
         · جاری {{ hasTenant(row.unit) ? partyLabel(row.unit.currentPayer) : 'مالک' }}
       </span>
       <strong>{{ formatPercent(row.areaShare * 100) }}</strong>
+    </div>
+  </section>
+
+  <section class="panel mb-3 js-enter">
+    <h2 class="h6 mb-2">سهم نفری این ماه</h2>
+    <p class="text-muted small mb-2">
+      ساکنان دائم به‌اضافه معادل مهمان (نفرشب ÷ روز ماه). فقط هزینه‌های نوع نفری با این سهم تقسیم می‌شوند.
+    </p>
+    <div v-for="row in store.summaries" :key="`occ-${row.unit.id}`" class="split-row">
+      <span>
+        {{ row.unit.name }}
+        · {{ formatPeople(row.unit.residents) }} ساکن
+        <template v-if="row.guestNights > 0"> · {{ formatPeople(row.guestNights) }} نفرشب</template>
+        · معادل {{ formatPeople(row.occupancy) }} نفر
+      </span>
+      <strong>{{ formatPercent(row.occupancyShare * 100) }}</strong>
     </div>
   </section>
 

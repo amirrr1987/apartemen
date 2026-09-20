@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { totalArea } from '../lib/calc'
 import { hasTenant, occupantLabel, parkingLabel, partyLabel } from '../data/defaults'
-import { formatMeter, formatPercent, formatToman } from '../lib/format'
+import { formatMeter, formatPercent, formatPeople, formatToman } from '../lib/format'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
@@ -39,6 +39,8 @@ const area = computed(() => totalArea(store.state.units))
     </div>
     <small class="text-muted">
       {{ formatMeter(row.unit.area) }} متر · {{ occupantLabel(row.unit) }} · {{ parkingLabel(row.unit) }}
+      · {{ formatPeople(row.unit.residents) }} ساکن
+      <template v-if="row.guestNights > 0"> · {{ formatPeople(row.guestNights) }} نفرشب مهمان</template>
     </small>
     <small class="d-block text-muted">
       جاری: {{ hasTenant(row.unit) ? partyLabel(row.unit.currentPayer) : 'مالک' }}
