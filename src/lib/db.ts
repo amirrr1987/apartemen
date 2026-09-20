@@ -3,7 +3,7 @@ import { createDefaultState, inferCategory } from '../data/defaults'
 import { currentPeriod } from './jalali'
 import { SCHEMA_MIGRATIONS, SCHEMA_STATEMENTS } from './schema'
 import { normalizeTursoToken } from './turso-token'
-import type { AppState, CostType, Expense, Payment, Unit } from '../types'
+import type { AppState, CostType, Expense, Payment, Unit, UnitGuestStay } from '../types'
 
 let client: Client | null = null
 
@@ -92,14 +92,23 @@ function rowPayment(row: Record<string, unknown>): Payment {
   }
 }
 
+function rowGuestStay(row: Record<string, unknown>): UnitGuestStay {
+  return {
+    unitId: Number(row.unit_id),
+    period: String(row.period),
+    guestNights: Math.max(0, Math.round(Number(row.guest_nights) || 0)),
+  }
+}
+
 export async function loadAppState(db: Client = getDbClient()): Promise<AppState | null> {
   await initSchema(db)
 
-  const [settingsRes, unitsRes, expensesRes, paymentsRes, metaRes] = await Promise.all([
+  const [settingsRes, unitsRes, expensesRes, paymentsRes, guestRes, metaRes] = await Promise.all([
     db.execute('SELECT * FROM settings WHERE id = 1'),
     db.execute('SELECT * FROM units ORDER BY id'),
     db.execute('SELECT * FROM expenses ORDER BY created_at'),
     db.execute('SELECT * FROM payments ORDER BY created_at'),
+    db.execute('SELECT * FROM guest_stays'),
     db.execute("SELECT value FROM meta WHERE key = 'current_period'"),
   ])
 
@@ -118,6 +127,9 @@ export async function loadAppState(db: Client = getDbClient()): Promise<AppState
     units: unitsRes.rows.map((row) => rowUnit(row as Record<string, unknown>)),
     expenses: expensesRes.rows.map((row) => rowExpense(row as Record<string, unknown>)),
     payments: paymentsRes.rows.map((row) => rowPayment(row as Record<string, unknown>)),
+    guestStays: guestRes.rows
+      .map((row) => rowGuestStay(row as Record<string, unknown>))
+      .filter((stay) => stay.guestNights > 0),
     settings: settingsRow
       ? {
           buildingName: String(settingsRow.building_name ?? ''),
@@ -151,6 +163,7 @@ export async function saveAppState(state: AppState, db: Client = getDbClient()):
     { sql: 'DELETE FROM units', args: [] as (string | number)[] },
     { sql: 'DELETE FROM expenses', args: [] as (string | number)[] },
     { sql: 'DELETE FROM payments', args: [] as (string | number)[] },
+    { sql: 'DELETE FROM guest_stays', args: [] as (string | number)[] },
     {
       sql: `INSERT INTO meta (key, value) VALUES ('current_period', ?)
         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
@@ -203,6 +216,12 @@ export async function saveAppState(state: AppState, db: Client = getDbClient()):
         payment.createdAt,
       ] as (string | number | null)[],
     })),
+    ...(state.guestStays ?? [])
+      .filter((stay) => stay.guestNights > 0)
+      .map((stay) => ({
+        sql: `INSERT INTO guest_stays (unit_id, period, guest_nights) VALUES (?, ?, ?)`,
+        args: [stay.unitId, stay.period, stay.guestNights] as (string | number)[],
+      })),
   ]
 
   await db.batch(stmts, 'write')

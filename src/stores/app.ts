@@ -6,7 +6,7 @@ import { createDefaultState, createEmptyUnit, catalogCategoryLabels, hasTenant, 
 import { isDbConfigured, loadAppState, saveAppState } from '../lib/db'
 import { newId } from '../lib/format'
 import { currentPeriod } from '../lib/jalali'
-import type { AppState, CostNature, CostType, Expense, ParkingScope, PartyRole, Unit } from '../types'
+import type { AppState, CostNature, CostType, Expense, ParkingScope, PartyRole, Unit, UnitGuestStay } from '../types'
 
 const STORAGE_KEY = 'aparteman-v2'
 
@@ -27,6 +27,14 @@ function normalizeUnit(unit: Partial<Unit>): Unit {
     currentPayer: unit.currentPayer ?? 'TENANT',
     capitalPayer: unit.capitalPayer ?? 'OWNER',
   }
+}
+
+function normalizeGuestStay(stay: Partial<UnitGuestStay>): UnitGuestStay | null {
+  const unitId = Number(stay.unitId)
+  const period = String(stay.period ?? '').trim()
+  const guestNights = Math.max(0, Math.round(Number(stay.guestNights) || 0))
+  if (!Number.isFinite(unitId) || unitId <= 0 || !period || guestNights <= 0) return null
+  return { unitId, period, guestNights }
 }
 
 function normalizeExpense(expense: Partial<Expense> & Pick<Expense, 'id' | 'title' | 'amount' | 'period' | 'createdAt'>): Expense {
@@ -61,6 +69,9 @@ function normalizeState(parsed: Partial<AppState>): AppState {
     units: (parsed.units ?? []).map((unit) => normalizeUnit(unit)),
     expenses: (parsed.expenses ?? []).map((expense) => normalizeExpense(expense as Expense)),
     payments: parsed.payments ?? [],
+    guestStays: (parsed.guestStays ?? [])
+      .map((stay) => normalizeGuestStay(stay))
+      .filter((stay): stay is UnitGuestStay => stay != null),
     settings: {
       buildingName: parsed.settings?.buildingName ?? fallback.settings.buildingName,
       managerFee: parsed.settings?.managerFee ?? fallback.settings.managerFee,
@@ -141,6 +152,7 @@ export const useAppStore = defineStore('app', () => {
     state.units = normalized.units
     state.expenses = normalized.expenses
     state.payments = normalized.payments
+    state.guestStays = normalized.guestStays ?? []
     state.settings = normalized.settings
     state.currentPeriod = normalized.currentPeriod
   }
@@ -180,6 +192,8 @@ export const useAppStore = defineStore('app', () => {
     state.settings.managerFee = Math.round(input.managerFee ?? 0)
     state.settings.setupComplete = true
     state.units = input.units.map((unit) => normalizeUnit(unit))
+    const ids = new Set(state.units.map((unit) => unit.id))
+    state.guestStays = state.guestStays.filter((stay) => ids.has(stay.unitId))
   }
 
   function addUnit() {
@@ -193,6 +207,7 @@ export const useAppStore = defineStore('app', () => {
     state.units = state.units.filter((unit) => unit.id !== id)
     state.expenses = state.expenses.filter((expense) => expense.unitId !== id)
     state.payments = state.payments.filter((payment) => payment.unitId !== id)
+    state.guestStays = state.guestStays.filter((stay) => stay.unitId !== id)
     return true
   }
 
@@ -291,7 +306,27 @@ export const useAppStore = defineStore('app', () => {
         createdAt: '',
       },
       state.units,
+      { period: state.currentPeriod, guestStays: state.guestStays },
     )
+  }
+
+  function guestNights(unitId: number, period = state.currentPeriod) {
+    return state.guestStays.find((stay) => stay.unitId === unitId && stay.period === period)?.guestNights ?? 0
+  }
+
+  function setGuestNights(unitId: number, nights: number, period = state.currentPeriod) {
+    const guestNightsValue = Math.max(0, Math.round(nights))
+    const index = state.guestStays.findIndex((stay) => stay.unitId === unitId && stay.period === period)
+    if (guestNightsValue <= 0) {
+      if (index >= 0) state.guestStays.splice(index, 1)
+      return
+    }
+    if (index >= 0) {
+      const current = state.guestStays[index]
+      if (current) current.guestNights = guestNightsValue
+      return
+    }
+    state.guestStays.push({ unitId, period, guestNights: guestNightsValue })
   }
 
   function unitPayments(unitId: number) {
@@ -404,6 +439,8 @@ export const useAppStore = defineStore('app', () => {
       'متراژ',
       'سهم متراژ',
       'ساکنان',
+      'نفرشب مهمان',
+      'معادل‌نفر',
       'جاری',
       'اساسی',
       'سهم مالک',
@@ -424,6 +461,8 @@ export const useAppStore = defineStore('app', () => {
           row.unit.area,
           (row.areaShare * 100).toFixed(2),
           row.unit.residents,
+          row.guestNights,
+          Number(row.occupancy.toFixed(2)),
           Math.round(row.currentCharge),
           Math.round(row.capitalCharge),
           Math.round(row.ownerCharge),
@@ -464,6 +503,8 @@ export const useAppStore = defineStore('app', () => {
     updateExpense,
     removeExpense,
     previewSplit,
+    guestNights,
+    setGuestNights,
     unitPayments,
     addPayment,
     updatePayment,
