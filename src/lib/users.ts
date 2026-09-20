@@ -1,3 +1,5 @@
+import { sha256Hex } from './sha256'
+
 export interface StoredUser {
   id: string
   username: string
@@ -23,6 +25,16 @@ function saveUsers(users: StoredUser[]): void {
   localStorage.setItem(USERS_KEY, JSON.stringify(users))
 }
 
+function newId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
 export function hasRegisteredUsers(): boolean {
   return loadUsers().length > 0
 }
@@ -33,11 +45,7 @@ export function findUserByUsername(username: string): StoredUser | undefined {
 }
 
 export async function hashPassword(password: string, salt: string): Promise<string> {
-  const data = new TextEncoder().encode(`${salt}:${password}`)
-  const hash = await crypto.subtle.digest('SHA-256', data)
-  return Array.from(new Uint8Array(hash))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('')
+  return sha256Hex(`${salt}:${password}`)
 }
 
 export async function registerUser(
@@ -59,7 +67,7 @@ export async function registerUser(
   }
 
   const user: StoredUser = {
-    id: crypto.randomUUID(),
+    id: newId(),
     username: normalized,
     passwordHash: await hashPassword(password, normalized),
     displayName: displayName.trim() || trimmed,
