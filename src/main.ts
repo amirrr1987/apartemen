@@ -11,7 +11,7 @@ import App from './App.vue'
 import router from './router'
 import { useAppStore } from './stores/app'
 
-gsap.defaults({ duration: 0.4, ease: 'power2.out' })
+gsap.defaults({ duration: 0.24, ease: 'power1.out' })
 
 const legacy = window.location.hash.replace(/^#\/?/, '')
 if (legacy === 'home') window.location.hash = '/'

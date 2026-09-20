@@ -8,7 +8,7 @@
 <template>
   <div v-if="open" class="sheet-backdrop confirm-backdrop" @click.self="settle(false)">
     <div class="panel confirm-dialog" role="dialog" aria-modal="true">
-      <p class="mb-3">{{ text }}</p>
+      <p class="mb-4">{{ text }}</p>
       <div class="d-flex gap-2">
         <button class="ghost-btn flex-grow-1" type="button" @click="settle(false)">
           <AppIcon name="x-lg" size="sm" />

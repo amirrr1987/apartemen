@@ -22,10 +22,10 @@ export function usePageEnter(root: Ref<HTMLElement | null>) {
         const targets = items && items.length ? Array.from(items) : Array.from(root.value?.children ?? [])
         if (!targets.length) return
         gsap.from(targets, {
-          y: reduce ? 0 : 14,
-          duration: reduce ? 0 : 0.28,
-          stagger: reduce ? 0 : 0.04,
-          ease: 'power2.out',
+          y: reduce ? 0 : 8,
+          duration: reduce ? 0 : 0.22,
+          stagger: reduce ? 0 : 0.03,
+          ease: 'power1.out',
           overwrite: 'auto',
           clearProps: 'transform',
         })
