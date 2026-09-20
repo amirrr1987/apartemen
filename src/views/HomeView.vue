@@ -3,7 +3,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { useToast } from '../composables/useToast'
 import { occupantLabel } from '../data/defaults'
-import { formatMeter, formatPercent, formatPeople, formatToman } from '../lib/format'
+import { formatMeter, formatToman } from '../lib/format'
 import { useAppStore } from '../stores/app'
 
 const store = useAppStore()
@@ -27,68 +27,62 @@ function paidRatio(charge: number, remaining: number) {
 </script>
 
 <template>
-  <section class="panel hero mb-3 js-enter">
-    <div class="hero-label">جمع شارژ این ماه</div>
-    <div class="hero-amount">{{ formatToman(store.totals.charge) }} تومان</div>
-    <div class="hero-sub">
-      <span><AppIcon name="wallet2" size="sm" /> دریافت‌شده {{ formatToman(store.totals.paid) }}</span>
-      <span><AppIcon name="hourglass-split" size="sm" /> مانده {{ formatToman(store.totals.remaining) }}</span>
-    </div>
-    <div class="hero-sub">
-      <span><AppIcon name="person" size="sm" /> مالک {{ formatToman(store.totals.ownerCharge) }}</span>
-      <span><AppIcon name="people" size="sm" /> مستأجر {{ formatToman(store.totals.tenantCharge) }}</span>
-    </div>
-    <div class="share-bar share-bar-light mt-3">
-      <span :style="{ width: `${paidRatio(store.totals.charge, store.totals.remaining)}%` }" />
-    </div>
-  </section>
-
-  <p class="note info mb-3 js-enter">
-    مبنای قانونی شارژ تناسب با مساحت اختصاصی است؛ مگر هزینه غیرمرتبط با متراژ، یا هزینه مصرفی نفری که مدیر با معادل مهمان حساب می‌کند.
-  </p>
-
-  <div v-if="!store.summaries.some((row) => row.charge)" class="panel empty mb-3 js-enter">
-    <p class="mb-2">هنوز هزینه‌ای برای این ماه ثبت نشده.</p>
-    <RouterLink class="primary-btn" to="/expenses/new">
-      <AppIcon name="plus-lg" size="sm" />
-      ثبت اولین هزینه
-    </RouterLink>
-  </div>
-
-  <button
-    v-for="row in store.summaries"
-    :key="row.unit.id"
-    class="unit-row js-enter"
-    type="button"
-    @click="router.push(`/units/${row.unit.id}`)"
-  >
-    <div class="unit-index">{{ row.unit.id }}</div>
-    <div class="unit-meta">
-      <strong>{{ row.unit.name }}</strong>
-      <small>
-        {{ formatMeter(row.unit.area) }} متر · سهم {{ formatPercent(row.areaShare * 100) }}
-        · {{ occupantLabel(row.unit) }}
-        · {{ formatPeople(row.occupancy) }} نفر
-        <template v-if="row.guestNights > 0"> · {{ formatPeople(row.guestNights) }} نفرشب مهمان</template>
-      </small>
-      <div class="share-bar mt-2">
-        <span :style="{ width: `${paidRatio(row.charge, row.remaining)}%` }" />
+  <div class="page">
+    <section class="hero js-enter">
+      <p class="hero-label">شارژ این ماه</p>
+      <p class="hero-amount">{{ formatToman(store.totals.charge) }}</p>
+      <p class="hero-unit">تومان</p>
+      <div class="metric-row">
+        <div>
+          <span class="metric-label">دریافت‌شده</span>
+          <strong>{{ formatToman(store.totals.paid) }}</strong>
+        </div>
+        <div>
+          <span class="metric-label">مانده</span>
+          <strong>{{ formatToman(store.totals.remaining) }}</strong>
+        </div>
       </div>
+      <div v-if="store.totals.charge" class="share-bar" aria-hidden="true">
+        <span :style="{ width: `${paidRatio(store.totals.charge, store.totals.remaining)}%` }" />
+      </div>
+    </section>
+
+    <div v-if="!store.summaries.some((row) => row.charge)" class="panel empty js-enter">
+      <p class="mb-0">هنوز هزینه‌ای برای این ماه ثبت نشده.</p>
+      <RouterLink class="primary-btn" to="/expenses/new">
+        <AppIcon name="plus-lg" size="sm" />
+        ثبت اولین هزینه
+      </RouterLink>
     </div>
-    <div class="text-end">
-      <div class="unit-amount">{{ formatToman(row.charge) }}</div>
+
+    <div v-else class="stack">
       <button
-        class="pay-btn mt-1"
-        :class="{ paid: row.remaining <= 0 && row.charge > 0 }"
+        v-for="row in store.summaries"
+        :key="row.unit.id"
+        class="unit-row js-enter"
         type="button"
-        @click.stop="togglePaid(row.unit.id, row.remaining)"
+        @click="router.push(`/units/${row.unit.id}`)"
       >
-        <AppIcon
-          :name="row.charge === 0 ? 'dash-circle' : row.remaining <= 0 ? 'check-circle-fill' : 'hourglass-split'"
-          size="sm"
-        />
-        {{ row.charge === 0 ? 'بدون شارژ' : row.remaining <= 0 ? 'تسویه شد' : `مانده ${formatToman(row.remaining)}` }}
+        <div class="unit-meta">
+          <strong>{{ row.unit.name }}</strong>
+          <small>{{ occupantLabel(row.unit) }} · {{ formatMeter(row.unit.area) }} متر</small>
+        </div>
+        <div class="unit-aside">
+          <div class="unit-amount">{{ formatToman(row.charge) }}</div>
+          <button
+            class="pay-btn mt-1"
+            :class="{ paid: row.remaining <= 0 && row.charge > 0 }"
+            type="button"
+            @click.stop="togglePaid(row.unit.id, row.remaining)"
+          >
+            <AppIcon
+              :name="row.charge === 0 ? 'dash-circle' : row.remaining <= 0 ? 'check-circle-fill' : 'hourglass-split'"
+              size="sm"
+            />
+            {{ row.charge === 0 ? 'بدون شارژ' : row.remaining <= 0 ? 'تسویه' : `مانده ${formatToman(row.remaining)}` }}
+          </button>
+        </div>
       </button>
     </div>
-  </button>
+  </div>
 </template>

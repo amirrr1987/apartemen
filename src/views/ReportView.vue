@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
-import { hasTenant, occupantLabel, partyLabel } from '../data/defaults'
+import { occupantLabel } from '../data/defaults'
 import { formatMeter, formatPercent, formatPeople, formatToman } from '../lib/format'
 import { periodLabel } from '../lib/jalali'
 import { useAppStore } from '../stores/app'
@@ -24,35 +24,43 @@ function download() {
 </script>
 
 <template>
-  <section class="panel hero mb-3 js-enter">
-    <div class="hero-label">گزارش {{ periodLabel(store.state.currentPeriod) }}</div>
-    <div class="hero-amount">{{ formatToman(store.totals.charge) }} تومان</div>
-    <div class="hero-sub">
-      <span><AppIcon name="wallet2" size="sm" /> دریافت {{ formatToman(store.totals.paid) }}</span>
-      <span><AppIcon name="hourglass-split" size="sm" /> مانده {{ formatToman(store.totals.remaining) }}</span>
-    </div>
-    <div class="share-bar share-bar-light mt-3">
-      <span :style="{ width: `${paidRatio}%` }" />
-    </div>
-  </section>
+  <div class="page">
+    <section class="hero js-enter">
+      <p class="hero-label">گزارش {{ periodLabel(store.state.currentPeriod) }}</p>
+      <p class="hero-amount">{{ formatToman(store.totals.charge) }}</p>
+      <p class="hero-unit">تومان</p>
+      <div class="metric-row">
+        <div>
+          <span class="metric-label">دریافت</span>
+          <strong>{{ formatToman(store.totals.paid) }}</strong>
+        </div>
+        <div>
+          <span class="metric-label">مانده</span>
+          <strong>{{ formatToman(store.totals.remaining) }}</strong>
+        </div>
+      </div>
+      <div class="share-bar" aria-hidden="true">
+        <span :style="{ width: `${paidRatio}%` }" />
+      </div>
+    </section>
 
-  <div class="stat-grid mb-3 js-enter">
-    <div class="stat-card">
-      <small><AppIcon name="receipt" size="sm" /> هزینه‌ها</small>
-      <strong>{{ store.periodExpenses.length.toLocaleString('fa-IR') }}</strong>
+    <div class="stat-grid js-enter">
+      <div class="stat-card">
+        <small>هزینه‌ها</small>
+        <strong>{{ store.periodExpenses.length.toLocaleString('fa-IR') }}</strong>
+      </div>
+      <div class="stat-card">
+        <small>دریافت‌ها</small>
+        <strong>{{ store.periodPayments.length.toLocaleString('fa-IR') }}</strong>
+      </div>
+      <div class="stat-card">
+        <small>وصول</small>
+        <strong>{{ formatPercent(paidRatio) }}</strong>
+      </div>
     </div>
-    <div class="stat-card">
-      <small><AppIcon name="wallet2" size="sm" /> دریافت‌ها</small>
-      <strong>{{ store.periodPayments.length.toLocaleString('fa-IR') }}</strong>
-    </div>
-    <div class="stat-card">
-      <small><AppIcon name="graph-up" size="sm" /> وصول</small>
-      <strong>{{ formatPercent(paidRatio) }}</strong>
-    </div>
-  </div>
 
-  <section class="panel mb-3 js-enter">
-    <h2 class="h6 mb-2">مالک و مستأجر</h2>
+    <section class="panel js-enter">
+      <h2 class="h6 mb-3">مالک و مستأجر</h2>
     <div class="split-row">
       <span>سهم مالک</span>
       <strong>{{ formatToman(store.totals.ownerCharge) }}</strong>
@@ -71,80 +79,62 @@ function download() {
     </div>
   </section>
 
-  <section class="panel mb-3 js-enter">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-      <h2 class="h6 m-0">وضعیت واحدها</h2>
-      <RouterLink class="chip" to="/units">
-        <AppIcon name="building" size="sm" />
-        مشخصات واحدها
-      </RouterLink>
-    </div>
-    <div class="report-scroll">
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th>واحد</th>
-            <th>شارژ</th>
-            <th>دریافت</th>
-            <th>مانده</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="row in store.summaries"
-            :key="row.unit.id"
-            role="button"
-            @click="router.push(`/units/${row.unit.id}`)"
-          >
-            <td>
-              <strong>{{ row.unit.name }}</strong>
-              <small class="d-block text-muted">
-                {{ occupantLabel(row.unit) }}
-                · {{ formatPeople(row.occupancy) }} نفر
-              </small>
-            </td>
-            <td>{{ formatToman(row.charge) }}</td>
-            <td>{{ formatToman(row.paid) }}</td>
-            <td>{{ formatToman(row.remaining) }}</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
+    <section class="panel js-enter">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h6 m-0">وضعیت واحدها</h2>
+        <RouterLink class="chip" to="/units">واحدها</RouterLink>
+      </div>
+      <div class="report-scroll">
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>واحد</th>
+              <th>شارژ</th>
+              <th>دریافت</th>
+              <th>مانده</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="row in store.summaries"
+              :key="row.unit.id"
+              role="button"
+              @click="router.push(`/units/${row.unit.id}`)"
+            >
+              <td>
+                <strong>{{ row.unit.name }}</strong>
+                <small class="d-block text-muted">{{ occupantLabel(row.unit) }}</small>
+              </td>
+              <td>{{ formatToman(row.charge) }}</td>
+              <td>{{ formatToman(row.paid) }}</td>
+              <td>{{ formatToman(row.remaining) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
-  <section class="panel mb-3 js-enter">
-    <h2 class="h6 mb-2">سهم متراژ</h2>
-    <p class="text-muted small mb-2">
-      مبنای قانونی شارژ تناسب با مساحت اختصاصی است؛ مگر هزینه‌ای که به متراژ ربط ندارد.
-    </p>
-    <div v-for="row in store.summaries" :key="`share-${row.unit.id}`" class="split-row">
-      <span>
-        {{ row.unit.name }}
-        · {{ formatMeter(row.unit.area) }} متر
-        · جاری {{ hasTenant(row.unit) ? partyLabel(row.unit.currentPayer) : 'مالک' }}
-      </span>
-      <strong>{{ formatPercent(row.areaShare * 100) }}</strong>
-    </div>
-  </section>
+    <section class="panel js-enter">
+      <h2 class="h6 mb-3">سهم متراژ</h2>
+      <div v-for="row in store.summaries" :key="`share-${row.unit.id}`" class="split-row">
+        <span>{{ row.unit.name }} · {{ formatMeter(row.unit.area) }} متر</span>
+        <strong>{{ formatPercent(row.areaShare * 100) }}</strong>
+      </div>
+    </section>
 
-  <section class="panel mb-3 js-enter">
-    <h2 class="h6 mb-2">سهم نفری این ماه</h2>
-    <p class="text-muted small mb-2">
-      ساکنان دائم به‌اضافه معادل مهمان (نفرشب ÷ روز ماه). فقط هزینه‌های نوع نفری با این سهم تقسیم می‌شوند.
-    </p>
-    <div v-for="row in store.summaries" :key="`occ-${row.unit.id}`" class="split-row">
-      <span>
-        {{ row.unit.name }}
-        · {{ formatPeople(row.unit.residents) }} ساکن
-        <template v-if="row.guestNights > 0"> · {{ formatPeople(row.guestNights) }} نفرشب</template>
-        · معادل {{ formatPeople(row.occupancy) }} نفر
-      </span>
-      <strong>{{ formatPercent(row.occupancyShare * 100) }}</strong>
-    </div>
-  </section>
+    <section class="panel js-enter">
+      <h2 class="h6 mb-3">سهم نفری</h2>
+      <div v-for="row in store.summaries" :key="`occ-${row.unit.id}`" class="split-row">
+        <span>
+          {{ row.unit.name }} · {{ formatPeople(row.occupancy) }} نفر
+        </span>
+        <strong>{{ formatPercent(row.occupancyShare * 100) }}</strong>
+      </div>
+    </section>
 
-  <button class="primary-btn w-100 js-enter" type="button" @click="download">
-    <AppIcon name="file-earmark-spreadsheet" size="sm" />
-    خروجی اکسل این ماه
-  </button>
+    <button class="primary-btn w-100 js-enter" type="button" @click="download">
+      <AppIcon name="file-earmark-spreadsheet" size="sm" />
+      خروجی اکسل این ماه
+    </button>
+  </div>
 </template>
