@@ -143,133 +143,146 @@ async function onDelete() {
 </script>
 
 <template>
-  <p class="note info mb-3">
-    ابتدا دسته‌بندی و عنوان را از لیست انتخاب کنید، سپس نوع تقسیم و مبلغ را وارد کنید.
-  </p>
+  <div class="page">
+    <p class="note">دسته و عنوان را انتخاب کنید، سپس نوع تقسیم و مبلغ را وارد کنید.</p>
 
-  <label class="form-label">دسته‌بندی</label>
-  <div class="quick-tags mb-3">
-    <button
-      v-for="item in store.expenseCategories"
-      :key="item"
-      type="button"
-      class="category-tag"
-      :class="{ active: category === item }"
-      @click="selectCategory(item)"
-    >
-      {{ item }}
-    </button>
-  </div>
+    <div class="field-group">
+      <label class="form-label">دسته‌بندی</label>
+      <div class="quick-tags">
+        <button
+          v-for="item in store.expenseCategories"
+          :key="item"
+          type="button"
+          class="category-tag"
+          :class="{ active: category === item }"
+          @click="selectCategory(item)"
+        >
+          {{ item }}
+        </button>
+      </div>
+    </div>
 
-  <label class="form-label">عنوان</label>
-  <div v-if="titleSuggestions.length" class="quick-tags mb-2">
-    <button
-      v-for="item in titleSuggestions"
-      :key="item.title"
-      type="button"
-      :class="{ active: title === item.title }"
-      @click="useCatalogItem(item)"
-    >
-      {{ item.title }}
-    </button>
-  </div>
-  <input v-model="title" class="field mb-3" type="text" placeholder="یا عنوان دلخواه بنویسید" />
+    <div class="field-group">
+      <label class="form-label">عنوان</label>
+      <div v-if="titleSuggestions.length" class="quick-tags">
+        <button
+          v-for="item in titleSuggestions"
+          :key="item.title"
+          type="button"
+          :class="{ active: title === item.title }"
+          @click="useCatalogItem(item)"
+        >
+          {{ item.title }}
+        </button>
+      </div>
+      <input v-model="title" class="field" type="text" placeholder="یا عنوان دلخواه بنویسید" />
+    </div>
 
-  <div class="d-flex align-items-center gap-2 mb-2">
-    <label class="form-label mb-0">نوع تقسیم بین واحدها</label>
-    <InfoTip text="مبنای قانونی: متراژی (ماده ۴)، مساوی برای هزینه‌های غیرمرتبط با متراژ، نفری برای مصرف با ساکنان دائم و معادل مهمان همان ماه." />
-  </div>
-  <div class="type-grid mb-3">
-    <button
-      v-for="item in COST_TYPES"
-      :key="item.value"
-      class="type-btn"
-      :class="{ active: type === item.value }"
-      type="button"
-      @click="type = item.value"
-    >
-      <AppIcon :name="typeIcon(item.value)" />
-      <strong>{{ item.label }}</strong>
-      <small>{{ item.hint }}</small>
-    </button>
-  </div>
+    <div class="field-group">
+      <div class="d-flex align-items-center gap-2">
+        <label class="form-label mb-0">نوع تقسیم بین واحدها</label>
+        <InfoTip text="مبنای قانونی: متراژی (ماده ۴)، مساوی برای هزینه‌های غیرمرتبط با متراژ، نفری برای مصرف با ساکنان دائم و معادل مهمان همان ماه." />
+      </div>
+      <div class="type-grid">
+        <button
+          v-for="item in COST_TYPES"
+          :key="item.value"
+          class="type-btn"
+          :class="{ active: type === item.value }"
+          type="button"
+          @click="type = item.value"
+        >
+          <AppIcon :name="typeIcon(item.value)" />
+          <strong>{{ item.label }}</strong>
+          <small>{{ item.hint }}</small>
+        </button>
+      </div>
+    </div>
 
-  <label class="form-label">ماهیت هزینه (مالک یا مستأجر)</label>
-  <div class="type-grid mb-2">
-    <button
-      v-for="item in COST_NATURES"
-      :key="item.value"
-      class="type-btn"
-      :class="{ active: nature === item.value }"
-      type="button"
-      @click="nature = item.value"
-    >
-      <AppIcon :name="item.value === 'CAPITAL' ? 'tools' : 'lightning-charge'" />
-      <strong>{{ item.label }}</strong>
-      <small>{{ item.hint }}</small>
-    </button>
-  </div>
+    <div class="field-group">
+      <label class="form-label">ماهیت هزینه (مالک یا مستأجر)</label>
+      <div class="type-grid">
+        <button
+          v-for="item in COST_NATURES"
+          :key="item.value"
+          class="type-btn"
+          :class="{ active: nature === item.value }"
+          type="button"
+          @click="nature = item.value"
+        >
+          <AppIcon :name="item.value === 'CAPITAL' ? 'tools' : 'lightning-charge'" />
+          <strong>{{ item.label }}</strong>
+          <small>{{ item.hint }}</small>
+        </button>
+      </div>
+    </div>
 
-  <template v-if="type !== 'UNIT'">
-    <label class="form-label">مشمولیت پارکینگ</label>
-    <div class="type-grid mb-3">
-      <button
-        v-for="item in PARKING_SCOPES"
-        :key="item.value"
-        class="type-btn"
-        :class="{ active: parkingScope === item.value }"
-        type="button"
-        @click="parkingScope = item.value"
-      >
-        <AppIcon :name="item.value === 'WITH_PARKING' ? 'car-front' : item.value === 'WITHOUT_PARKING' ? 'car-front-fill' : 'buildings'" />
-        <strong>{{ item.label }}</strong>
-        <small>{{ item.hint }}</small>
+    <div v-if="type !== 'UNIT'" class="field-group">
+      <label class="form-label">مشمولیت پارکینگ</label>
+      <div class="type-grid">
+        <button
+          v-for="item in PARKING_SCOPES"
+          :key="item.value"
+          class="type-btn"
+          :class="{ active: parkingScope === item.value }"
+          type="button"
+          @click="parkingScope = item.value"
+        >
+          <AppIcon :name="item.value === 'WITH_PARKING' ? 'car-front' : item.value === 'WITHOUT_PARKING' ? 'car-front-fill' : 'buildings'" />
+          <strong>{{ item.label }}</strong>
+          <small>{{ item.hint }}</small>
+        </button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <label class="form-label">مبلغ (تومان)</label>
+      <input v-model="amountText" class="field" inputmode="numeric" placeholder="مثلاً ۱۲۰۰۰۰۰" />
+      <small v-if="words" class="text-muted">{{ words }}</small>
+    </div>
+
+    <div v-if="type === 'UNIT'" class="field-group">
+      <label class="form-label">واحد مسئول</label>
+      <select v-model.number="unitId" class="field">
+        <option v-for="unit in store.state.units" :key="unit.id" :value="unit.id">{{ unit.name }}</option>
+      </select>
+    </div>
+
+    <div class="field-group">
+      <label class="form-label">یادداشت (اختیاری)</label>
+      <textarea v-model="notes" class="field" rows="2" />
+    </div>
+
+    <div v-if="split" class="panel">
+      <strong class="d-block mb-2">
+        پیش‌نمایش · {{ category }} · {{ natureLabel(nature) }}
+        <span v-if="type !== 'UNIT'" class="text-muted"> · {{ parkingScopeLabel(parkingScope) }}</span>
+      </strong>
+      <div v-for="unit in store.state.units" :key="unit.id" class="split-row">
+        <span>
+          {{ unit.name }}
+          <small class="text-muted">
+            ({{ partyLabel(payerFor(unit, nature)) }}
+            <template v-if="type === 'PERSON'">
+              · {{ formatPeople(store.summaries.find((row) => row.unit.id === unit.id)?.occupancy ?? unit.residents) }} نفر
+            </template>)
+          </small>
+        </span>
+        <span>{{ formatToman(split[unit.id] ?? 0) }} تومان</span>
+      </div>
+    </div>
+
+    <div class="stack">
+      <button class="primary-btn w-100" type="button" :disabled="!canSave" @click="save">
+        <AppIcon :name="isEdit ? 'check-lg' : 'plus-lg'" size="sm" />
+        {{ isEdit ? 'ذخیره تغییرات' : 'ثبت هزینه' }}
+      </button>
+      <button v-if="isEdit" class="danger-btn w-100" type="button" @click="onDelete">
+        <AppIcon name="trash" size="sm" />
+        حذف هزینه
       </button>
     </div>
-  </template>
-
-  <label class="form-label">مبلغ (تومان)</label>
-  <input v-model="amountText" class="field" inputmode="numeric" placeholder="مثلاً ۱۲۰۰۰۰۰" />
-  <small v-if="words" class="text-muted d-block mb-3">{{ words }}</small>
-  <small v-else class="d-block mb-3">&nbsp;</small>
-
-  <div v-if="type === 'UNIT'" class="mb-3">
-    <label class="form-label">واحد مسئول</label>
-    <select v-model.number="unitId" class="field">
-      <option v-for="unit in store.state.units" :key="unit.id" :value="unit.id">{{ unit.name }}</option>
-    </select>
   </div>
-
-  <label class="form-label">یادداشت (اختیاری)</label>
-  <textarea v-model="notes" class="field mb-3" rows="2" />
-
-  <div v-if="split" class="panel mb-3">
-    <strong class="d-block mb-2">
-      پیش‌نمایش · {{ category }} · {{ natureLabel(nature) }}
-      <span v-if="type !== 'UNIT'" class="text-muted"> · {{ parkingScopeLabel(parkingScope) }}</span>
-    </strong>
-    <div v-for="unit in store.state.units" :key="unit.id" class="split-row">
-      <span>
-        {{ unit.name }}
-        <small class="text-muted">
-          ({{ partyLabel(payerFor(unit, nature)) }}
-          <template v-if="type === 'PERSON'">
-            · {{ formatPeople(store.summaries.find((row) => row.unit.id === unit.id)?.occupancy ?? unit.residents) }} نفر
-          </template>)
-        </small>
-      </span>
-      <span>{{ formatToman(split[unit.id] ?? 0) }} تومان</span>
-    </div>
-  </div>
-
-  <button class="primary-btn w-100" type="button" :disabled="!canSave" @click="save">
-    <AppIcon :name="isEdit ? 'check-lg' : 'plus-lg'" size="sm" />
-    {{ isEdit ? 'ذخیره تغییرات' : 'ثبت هزینه' }}
-  </button>
-  <button v-if="isEdit" class="danger-btn w-100 mt-2" type="button" @click="onDelete">
-    <AppIcon name="trash" size="sm" />
-    حذف هزینه
-  </button>
 </template>
 
 <style scoped>

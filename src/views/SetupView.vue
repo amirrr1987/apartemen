@@ -90,51 +90,57 @@ function finish() {
 
 <template>
   <div class="setup-screen">
-    <div class="setup-card panel">
+    <div class="setup-card">
       <div class="setup-header">
         <div class="brand-mark">ش</div>
         <div>
-          <h1>تعریف اولیه ساختمان</h1>
-          <p>بر اساس قانون تملک آپارتمان‌ها — همه واحدها و پارامترها را یک‌بار مشخص کنید.</p>
+          <h1>تعریف ساختمان</h1>
+          <p>نام، تعداد واحد و متراژ را یک‌بار مشخص کنید.</p>
         </div>
       </div>
 
-      <div class="setup-steps mb-4">
+      <div class="setup-steps">
         <span :class="{ active: step >= 1 }">۱. ساختمان</span>
         <span :class="{ active: step >= 2 }">۲. واحدها</span>
         <span :class="{ active: step >= 3 }">۳. تأیید</span>
       </div>
 
-      <template v-if="step === 1">
-        <label class="form-label" for="building">نام ساختمان</label>
-        <input id="building" v-model="buildingName" class="field mb-3" type="text" placeholder="مثلاً ساختمان نیلوفر" />
+      <div v-if="step === 1" class="page">
+        <div class="field-group">
+          <label class="form-label" for="building">نام ساختمان</label>
+          <input id="building" v-model="buildingName" class="field" type="text" placeholder="مثلاً ساختمان نیلوفر" />
+        </div>
 
-        <label class="form-label" for="count">تعداد واحدها</label>
-        <input
-          id="count"
-          v-model.number="unitCount"
-          class="field mb-3"
-          type="number"
-          min="1"
-          max="50"
-          @change="syncDrafts"
-        />
+        <div class="field-group">
+          <label class="form-label" for="count">تعداد واحدها</label>
+          <input
+            id="count"
+            v-model.number="unitCount"
+            class="field"
+            type="number"
+            min="1"
+            max="50"
+            @change="syncDrafts"
+          />
+        </div>
 
-        <label class="form-label" for="fee">حق‌الزحمه مصوب مدیر (اختیاری)</label>
-        <input id="fee" v-model="managerFee" class="field mb-4" inputmode="numeric" placeholder="۰" />
+        <div class="field-group">
+          <label class="form-label" for="fee">حق‌الزحمه مصوب مدیر (اختیاری)</label>
+          <input id="fee" v-model="managerFee" class="field" inputmode="numeric" placeholder="۰" />
+        </div>
 
         <button class="primary-btn w-100" type="button" :disabled="!canNextStep1" @click="nextStep">
           ادامه
           <AppIcon name="chevron-left" size="sm" />
         </button>
-      </template>
+      </div>
 
-      <template v-else-if="step === 2">
-        <p class="note info mb-3">
+      <div v-else-if="step === 2" class="page">
+        <p class="note">
           متراژ اختصاصی مبنای تقسیم متراژی است. پارکینگ فقط برای هزینه‌های مرتبط با پارکینگ اعمال می‌شود.
         </p>
 
-        <article v-for="unit in drafts" :key="unit.id" class="unit-draft panel mb-3">
+        <article v-for="unit in drafts" :key="unit.id" class="unit-draft panel">
           <strong class="d-block mb-2">{{ unit.name }}</strong>
 
           <label class="form-label">نام واحد</label>
@@ -174,10 +180,10 @@ function finish() {
             ادامه
           </button>
         </div>
-      </template>
+      </div>
 
-      <template v-else>
-        <div class="panel mb-3">
+      <div v-else class="page">
+        <div class="panel">
           <p><strong>ساختمان:</strong> {{ buildingName }}</p>
           <p><strong>تعداد واحد:</strong> {{ drafts.length.toLocaleString('fa-IR') }}</p>
           <p>
@@ -194,62 +200,7 @@ function finish() {
             شروع کار
           </button>
         </div>
-      </template>
+      </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.setup-screen {
-  display: grid;
-  place-items: start center;
-  min-height: 100dvh;
-  padding: 24px 16px 48px;
-}
-
-.setup-card {
-  width: min(100%, 560px);
-  padding: 24px;
-}
-
-.setup-header {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 20px;
-}
-
-.setup-header h1 {
-  margin: 0 0 4px;
-  font-size: 1.15rem;
-}
-
-.setup-header p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.9rem;
-}
-
-.setup-steps {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.setup-steps span {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--bg-2);
-  color: var(--muted);
-  font-size: 0.78rem;
-  font-weight: 600;
-}
-
-.setup-steps span.active {
-  background: var(--primary-soft);
-  color: var(--primary-dark);
-}
-
-.unit-draft {
-  padding: 16px;
-}
-</style>

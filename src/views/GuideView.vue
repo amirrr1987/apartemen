@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import AppIcon from '../components/AppIcon.vue'
-
 const items = [
   { id: 'area', title: '۱. سهم متراژی (ماده ۴)', body: 'هزینه‌های مرتبط با زیربنای اختصاصی — موتورخانه، بام، تأسیسات مرکزی — به نسبت متراژ هر واحد تقسیم می‌شود.' },
   { id: 'formula', title: '۲. انواع تقسیم', body: 'متراژی، مساوی (برای هزینه‌های غیرمرتبط با متراژ)، نفری (مصرف و ساکنان به‌اضافه معادل مهمان)، و اختصاصی (فقط یک واحد). روش تقسیم را مدیر ساختمان تعیین می‌کند و در نرم‌افزار ثبت می‌شود.' },
@@ -14,16 +12,14 @@ const items = [
 </script>
 
 <template>
-  <section class="panel mb-3">
-    <h2 class="h5 d-flex align-items-center gap-2">
-      <AppIcon name="book" />
-      پاسخ کوتاه
-    </h2>
-    <p class="mb-0">
-      مبنای قانونی شارژ، <strong>اصل تناسب با مساحت اختصاصی</strong> است؛ مگر هزینه‌ای که ارتباطی با متراژ ندارد و مساوی تقسیم می‌شود، یا مدیر برای مصرف روش نفری (با معادل مهمان) تعیین کند.
-    </p>
-    <p class="mt-2 mb-0 text-muted">مبنای اصلی: قانون تملک آپارتمان‌ها، مواد ۴ و ۱۰.</p>
-  </section>
+  <div class="page">
+    <section class="hero">
+      <p class="hero-label">پاسخ کوتاه</p>
+      <p class="hero-title">تناسب با متراژ</p>
+      <p class="hero-unit">
+        مبنای قانونی شارژ، اصل تناسب با مساحت اختصاصی است؛ مگر هزینه‌ای که به متراژ ربط ندارد.
+      </p>
+    </section>
 
   <div class="accordion" id="guideAccordion">
     <div v-for="(item, index) in items" :key="item.id" class="accordion-item">
@@ -48,5 +44,6 @@ const items = [
         <div class="accordion-body text-muted">{{ item.body }}</div>
       </div>
     </div>
+  </div>
   </div>
 </template>

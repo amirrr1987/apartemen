@@ -7,7 +7,7 @@ import { useToast } from '../composables/useToast'
 import { COST_TYPES, hasTenant, natureLabel, partyLabel } from '../data/defaults'
 import { occupancyOf } from '../lib/calc'
 import { formatFaDate, daysInPeriod, periodLabel } from '../lib/jalali'
-import { formatPeople, formatPercent, formatToman, parseAmount, toFaDigits } from '../lib/format'
+import { formatPeople, formatToman, parseAmount } from '../lib/format'
 import { useAppStore } from '../stores/app'
 import type { PartyRole, Payment } from '../types'
 
@@ -160,21 +160,14 @@ function togglePaid(party?: PartyRole) {
 </script>
 
 <template>
-  <div v-if="unit && summary">
-    <section class="panel hero mb-3">
-      <div class="hero-label">{{ unit.name }} · شارژ این ماه</div>
-      <div class="hero-amount">{{ formatToman(summary.charge) }} تومان</div>
-      <div class="hero-sub">
-        <span>سهم متراژ {{ formatPercent(summary.areaShare * 100) }}</span>
-        <span>مانده {{ formatToman(summary.remaining) }}</span>
-      </div>
-      <div class="hero-sub">
-        <span>ساکن {{ toFaDigits(unit.residents) }}</span>
-        <span>معادل نفری {{ formatPeople(summary.occupancy) }}</span>
-      </div>
+  <div v-if="unit && summary" class="page">
+    <section class="hero">
+      <p class="hero-label">{{ unit.name }}</p>
+      <p class="hero-amount">{{ formatToman(summary.charge) }}</p>
+      <p class="hero-unit">تومان · مانده {{ formatToman(summary.remaining) }}</p>
     </section>
 
-    <div class="segmented mb-3">
+    <div class="segmented">
       <button type="button" :class="{ active: tab === 'pay' }" @click="tab = 'pay'">
         <AppIcon name="wallet2" size="sm" />
         دریافت
@@ -190,19 +183,23 @@ function togglePaid(party?: PartyRole) {
     </div>
 
     <template v-if="tab === 'pay'">
-      <div class="panel mb-3">
-        <label class="form-label">طرف پرداخت</label>
-        <select v-model="payParty" class="field mb-2">
-          <option value="OWNER">مالک</option>
-          <option v-if="hasTenant(unit) || summary.tenantCharge > 0" value="TENANT">مستأجر</option>
-          <option value="UNIT">واحد (بدون تفکیک)</option>
-        </select>
-        <label class="form-label">مبلغ (تومان)</label>
-        <div class="d-flex gap-2 mb-2">
-          <input v-model="payAmount" class="field flex-grow-1" inputmode="numeric" placeholder="مبلغ دریافت" />
-          <button class="ghost-btn py-1 px-2" type="button" @click="fillRemaining">مانده</button>
+      <div class="panel">
+        <div class="field-group">
+          <label class="form-label">طرف پرداخت</label>
+          <select v-model="payParty" class="field">
+            <option value="OWNER">مالک</option>
+            <option v-if="hasTenant(unit) || summary.tenantCharge > 0" value="TENANT">مستأجر</option>
+            <option value="UNIT">واحد (بدون تفکیک)</option>
+          </select>
         </div>
-        <div class="d-flex gap-2">
+        <div class="field-group mt-3">
+          <label class="form-label">مبلغ (تومان)</label>
+          <div class="d-flex gap-2">
+            <input v-model="payAmount" class="field flex-grow-1" inputmode="numeric" placeholder="مبلغ دریافت" />
+            <button class="ghost-btn" type="button" @click="fillRemaining">مانده</button>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-3">
           <button class="primary-btn flex-grow-1" type="button" :disabled="parseAmount(payAmount) <= 0" @click="savePayment">
             <AppIcon :name="editingPaymentId ? 'check-lg' : 'plus-lg'" size="sm" />
             {{ editingPaymentId ? 'ذخیره دریافت' : 'ثبت دریافت' }}
@@ -214,22 +211,24 @@ function togglePaid(party?: PartyRole) {
         </div>
       </div>
 
-      <div class="d-flex gap-2 mb-3">
-        <button class="ghost-btn flex-grow-1" type="button" @click="togglePaid('OWNER')">
-          {{ summary.ownerRemaining <= 0 && summary.ownerCharge > 0 ? 'لغو تسویه مالک' : 'تسویه مالک' }}
-        </button>
-        <button
-          v-if="hasTenant(unit) || summary.tenantCharge > 0"
-          class="ghost-btn flex-grow-1"
-          type="button"
-          @click="togglePaid('TENANT')"
-        >
-          {{ summary.tenantRemaining <= 0 && summary.tenantCharge > 0 ? 'لغو تسویه مستأجر' : 'تسویه مستأجر' }}
+      <div class="stack">
+        <div class="d-flex gap-2">
+          <button class="ghost-btn flex-grow-1" type="button" @click="togglePaid('OWNER')">
+            {{ summary.ownerRemaining <= 0 && summary.ownerCharge > 0 ? 'لغو تسویه مالک' : 'تسویه مالک' }}
+          </button>
+          <button
+            v-if="hasTenant(unit) || summary.tenantCharge > 0"
+            class="ghost-btn flex-grow-1"
+            type="button"
+            @click="togglePaid('TENANT')"
+          >
+            {{ summary.tenantRemaining <= 0 && summary.tenantCharge > 0 ? 'لغو تسویه مستأجر' : 'تسویه مستأجر' }}
+          </button>
+        </div>
+        <button class="ghost-btn w-100" type="button" @click="togglePaid()">
+          {{ summary.charge === 0 ? 'بدون شارژ' : summary.remaining <= 0 ? 'لغو تسویه کل واحد' : 'تسویه کل واحد' }}
         </button>
       </div>
-      <button class="ghost-btn w-100 mb-3" type="button" @click="togglePaid()">
-        {{ summary.charge === 0 ? 'بدون شارژ' : summary.remaining <= 0 ? 'لغو تسویه کل واحد' : 'تسویه کل واحد' }}
-      </button>
 
       <div v-if="!receipts.length" class="panel empty">هنوز دریافتی برای این ماه ثبت نشده است.</div>
       <div v-else class="panel">
@@ -270,40 +269,55 @@ function togglePaid(party?: PartyRole) {
     </template>
 
     <template v-else>
-      <label class="form-label">مالک</label>
-      <input v-model="owner" class="field mb-3" type="text" placeholder="نام مالک" />
-      <label class="form-label">مستأجر</label>
-      <input v-model="tenant" class="field mb-3" type="text" placeholder="خالی = مالک‌نشین" />
-      <label class="form-label">مسئول هزینه جاری</label>
-      <select v-model="currentPayer" class="field mb-3">
-        <option value="TENANT">مستأجر / استفاده‌کننده</option>
-        <option value="OWNER">مالک</option>
-      </select>
-      <label class="form-label">مسئول هزینه اساسی</label>
-      <select v-model="capitalPayer" class="field mb-3">
-        <option value="OWNER">مالک</option>
-        <option value="TENANT">مستأجر (اگر اجاره‌نامه چنین گفته باشد)</option>
-      </select>
-      <label class="form-label">متراژ اختصاصی (مترمربع)</label>
-      <input v-model="areaText" class="field mb-3" inputmode="decimal" />
-      <label class="form-label">تعداد ساکنان دائم</label>
-      <input v-model="residentsText" class="field mb-3" inputmode="numeric" />
-      <label class="form-label">نفرشب مهمان {{ periodLabel(store.state.currentPeriod) }}</label>
-      <input v-model="guestNightsText" class="field" inputmode="numeric" placeholder="مثلاً ۲۰" />
-      <small class="text-muted d-block mb-3">
-        تعداد مهمان × تعداد شب؛ مثلاً ۲ مهمان ۱۰ شب = ۲۰.
-        معادل این ماه {{ formatPeople(occupancyDraft) }} نفر
-        <template v-if="guestNightsDraft > 0">
-          ({{ formatPeople(guestEquivalentDraft) }} مهمان)
-        </template>
-        . فقط روی هزینه نفری اثر دارد.
-      </small>
-      <label class="form-check mb-3">
+      <div class="field-group">
+        <label class="form-label">مالک</label>
+        <input v-model="owner" class="field" type="text" placeholder="نام مالک" />
+      </div>
+      <div class="field-group">
+        <label class="form-label">مستأجر</label>
+        <input v-model="tenant" class="field" type="text" placeholder="خالی = مالک‌نشین" />
+      </div>
+      <div class="field-group">
+        <label class="form-label">مسئول هزینه جاری</label>
+        <select v-model="currentPayer" class="field">
+          <option value="TENANT">مستأجر / استفاده‌کننده</option>
+          <option value="OWNER">مالک</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label class="form-label">مسئول هزینه اساسی</label>
+        <select v-model="capitalPayer" class="field">
+          <option value="OWNER">مالک</option>
+          <option value="TENANT">مستأجر (اگر اجاره‌نامه چنین گفته باشد)</option>
+        </select>
+      </div>
+      <div class="field-group">
+        <label class="form-label">متراژ اختصاصی (مترمربع)</label>
+        <input v-model="areaText" class="field" inputmode="decimal" />
+      </div>
+      <div class="field-group">
+        <label class="form-label">تعداد ساکنان دائم</label>
+        <input v-model="residentsText" class="field" inputmode="numeric" />
+      </div>
+      <div class="field-group">
+        <label class="form-label">نفرشب مهمان {{ periodLabel(store.state.currentPeriod) }}</label>
+        <input v-model="guestNightsText" class="field" inputmode="numeric" placeholder="مثلاً ۲۰" />
+        <small class="text-muted">
+          معادل این ماه {{ formatPeople(occupancyDraft) }} نفر
+          <template v-if="guestNightsDraft > 0">
+            ({{ formatPeople(guestEquivalentDraft) }} مهمان)
+          </template>
+          — فقط روی هزینه نفری اثر دارد.
+        </small>
+      </div>
+      <label class="form-check">
         <input v-model="hasParking" class="form-check-input" type="checkbox" />
         <span class="form-check-label">دارای حق استفاده از پارکینگ</span>
       </label>
-      <label class="form-label">یادداشت</label>
-      <textarea v-model="notes" class="field mb-3" rows="2" placeholder="مثلاً کولر روی بام دارد" />
+      <div class="field-group">
+        <label class="form-label">یادداشت</label>
+        <textarea v-model="notes" class="field" rows="2" placeholder="مثلاً کولر روی بام دارد" />
+      </div>
       <button class="primary-btn w-100" type="button" @click="saveUnit">
         <AppIcon name="check-lg" size="sm" />
         ذخیره واحد

@@ -67,68 +67,76 @@ async function onRemoveUnit(id: number) {
 </script>
 
 <template>
-  <label class="form-label">نام ساختمان</label>
-  <input v-model="store.state.settings.buildingName" class="field mb-3" type="text" />
+  <div class="page">
+    <div class="field-group">
+      <label class="form-label">نام ساختمان</label>
+      <input v-model="store.state.settings.buildingName" class="field" type="text" />
+    </div>
 
-  <div class="d-flex justify-content-between align-items-center mb-2">
-    <label class="form-label mb-0">واحدها ({{ store.state.units.length.toLocaleString('fa-IR') }})</label>
-    <button class="ghost-btn py-1 px-2" type="button" @click="store.addUnit()">
-      <AppIcon name="plus-lg" size="sm" />
-      واحد جدید
-    </button>
-  </div>
-  <div class="panel mb-3">
-    <div v-for="unit in store.state.units" :key="unit.id" class="d-flex justify-content-between align-items-center gap-2 mb-2">
-      <button class="text-start flex-grow-1 border-0 bg-transparent p-0" type="button" @click="router.push(`/units/${unit.id}`)">
-        <strong>{{ unit.name }}</strong>
-        <small class="d-block text-muted">{{ unit.area }} متر · {{ parkingLabel(unit) }}</small>
-      </button>
-      <button
-        v-if="store.state.units.length > 1"
-        class="ghost-btn icon-action"
-        type="button"
-        aria-label="حذف"
-        @click="onRemoveUnit(unit.id)"
-      >
-        <AppIcon name="trash" size="sm" />
+    <div>
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <label class="form-label mb-0">واحدها</label>
+        <button class="ghost-btn py-1 px-3" type="button" @click="store.addUnit()">
+          <AppIcon name="plus-lg" size="sm" />
+          واحد جدید
+        </button>
+      </div>
+      <div class="stack">
+        <div v-for="unit in store.state.units" :key="unit.id" class="unit-row">
+          <button class="expense-open" type="button" @click="router.push(`/units/${unit.id}`)">
+            <strong>{{ unit.name }}</strong>
+            <small class="d-block text-muted">{{ unit.area }} متر · {{ parkingLabel(unit) }}</small>
+          </button>
+          <button
+            v-if="store.state.units.length > 1"
+            class="ghost-btn icon-action"
+            type="button"
+            aria-label="حذف"
+            @click="onRemoveUnit(unit.id)"
+          >
+            <AppIcon name="trash" size="sm" />
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <label class="form-label">حق‌الزحمه مصوب مدیر (تومان)</label>
+      <input
+        class="field"
+        type="number"
+        min="0"
+        :value="store.state.settings.managerFee || ''"
+        @input="store.state.settings.managerFee = Number(($event.target as HTMLInputElement).value) || 0"
+      />
+      <p class="text-muted small mt-2 mb-3">فقط با تصویب مجمع معتبر است و جدا از شارژ ثبت می‌شود.</p>
+      <button class="ghost-btn w-100" type="button" @click="onManagerFee">
+        <AppIcon name="person-badge" size="sm" />
+        ثبت حق‌الزحمه این ماه
       </button>
     </div>
-  </div>
 
-  <label class="form-label">حق‌الزحمه مصوب مدیر (تومان)</label>
-  <input
-    class="field mb-2"
-    type="number"
-    min="0"
-    :value="store.state.settings.managerFee || ''"
-    @input="store.state.settings.managerFee = Number(($event.target as HTMLInputElement).value) || 0"
-  />
-  <p class="text-muted small">پرداخت فقط با تصویب مجمع معتبر است و باید جدا از شارژ ثبت شود.</p>
-  <button class="ghost-btn w-100 mb-3" type="button" @click="onManagerFee">
-    <AppIcon name="person-badge" size="sm" />
-    ثبت حق‌الزحمه این ماه
-  </button>
-
-  <div class="d-grid gap-2">
-    <button class="ghost-btn" type="button" @click="router.push('/setup')">
-      <AppIcon name="gear-wide-connected" size="sm" />
-      ویرایش تعریف اولیه
-    </button>
-    <button class="primary-btn" type="button" @click="onExport">
-      <AppIcon name="download" size="sm" />
-      دانلود پشتیبان
-    </button>
-    <button class="ghost-btn" type="button" @click="copyBackup">
-      <AppIcon name="clipboard" size="sm" />
-      کپی پشتیبان
-    </button>
-    <button class="ghost-btn" type="button" @click="open()">
-      <AppIcon name="upload" size="sm" />
-      بازیابی از فایل
-    </button>
-    <button class="danger-btn" type="button" @click="onReset">
-      <AppIcon name="arrow-counterclockwise" size="sm" />
-      بازنشانی همه داده‌ها
-    </button>
+    <div class="settings-actions">
+      <button class="ghost-btn" type="button" @click="router.push('/setup')">
+        <AppIcon name="gear-wide-connected" size="sm" />
+        ویرایش تعریف اولیه
+      </button>
+      <button class="primary-btn" type="button" @click="onExport">
+        <AppIcon name="download" size="sm" />
+        دانلود پشتیبان
+      </button>
+      <button class="ghost-btn" type="button" @click="copyBackup">
+        <AppIcon name="clipboard" size="sm" />
+        کپی پشتیبان
+      </button>
+      <button class="ghost-btn" type="button" @click="open()">
+        <AppIcon name="upload" size="sm" />
+        بازیابی از فایل
+      </button>
+      <button class="danger-btn" type="button" @click="onReset">
+        <AppIcon name="arrow-counterclockwise" size="sm" />
+        بازنشانی همه داده‌ها
+      </button>
+    </div>
   </div>
 </template>
