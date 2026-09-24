@@ -25,12 +25,25 @@ const groups = computed(() =>
 
 const groupsWithReceipts = computed(() => groups.value.filter((group) => group.items.length > 0))
 
+const dueUnits = computed(() =>
+  store.summaries
+    .filter((row) => row.remaining > 0)
+    .slice()
+    .sort((a, b) => b.remaining - a.remaining),
+)
+
 const received = computed(() => receipts.value.reduce((sum, payment) => sum + payment.amount, 0))
 
 async function onRemove(id: string) {
   if (!(await confirm('این دریافت حذف شود؟'))) return
   store.removePayment(id)
   notify('دریافت حذف شد')
+}
+
+function statusChip(charge: number, remaining: number) {
+  if (charge === 0) return { label: 'بدون شارژ', className: 'muted' }
+  if (remaining <= 0) return { label: 'تسویه', className: 'ok' }
+  return { label: 'مانده', className: 'accent' }
 }
 </script>
 
@@ -52,24 +65,72 @@ async function onRemove(id: string) {
       </div>
     </section>
 
+    <div v-if="dueUnits.length" class="panel js-enter">
+      <p class="section-label">واحدهای دارای مانده</p>
+      <div class="stack">
+        <button
+          v-for="row in dueUnits"
+          :key="row.unit.id"
+          class="unit-row"
+          type="button"
+          @click="router.push(`/units/${row.unit.id}?tab=pay`)"
+        >
+          <div class="unit-meta">
+            <strong>{{ row.unit.name }}</strong>
+            <small>ثبت دریافت برای این واحد</small>
+          </div>
+          <div class="unit-aside">
+            <div class="unit-amount">{{ formatToman(row.remaining) }}</div>
+            <span class="chip accent">مانده</span>
+          </div>
+        </button>
+      </div>
+    </div>
+
     <div v-if="!receipts.length" class="panel empty js-enter">
-      <p class="mb-0">هنوز دریافتی ثبت نشده. از صفحه خانه وارد واحد شوید.</p>
-      <RouterLink class="primary-btn" to="/">
-        <AppIcon name="house" size="sm" />
-        رفتن به خانه
+      <p class="mb-0">
+        {{
+          dueUnits.length
+            ? 'هنوز دریافتی ثبت نشده. یکی از واحدهای بالا را باز کنید.'
+            : store.totals.charge > 0
+              ? 'همه واحدها تسویه شده‌اند.'
+              : 'ابتدا هزینه ثبت کنید، بعد دریافت شارژ.'
+        }}
+      </p>
+      <RouterLink v-if="!store.totals.charge" class="primary-btn" to="/expenses/new">
+        <AppIcon name="plus-lg" size="sm" />
+        ثبت هزینه
+      </RouterLink>
+      <RouterLink v-else-if="!dueUnits.length" class="primary-btn" to="/report">
+        <AppIcon name="bar-chart" size="sm" />
+        رفتن به گزارش
       </RouterLink>
     </div>
 
     <div v-else class="stack">
+      <p class="section-label js-enter">تاریخچه دریافت‌ها</p>
       <article v-for="group in groupsWithReceipts" :key="group.row.unit.id" class="panel js-enter">
-        <button class="expense-open w-100" type="button" @click="router.push(`/units/${group.row.unit.id}`)">
+        <button
+          class="expense-open w-100"
+          type="button"
+          @click="router.push(`/units/${group.row.unit.id}?tab=pay`)"
+        >
           <div class="d-flex justify-content-between align-items-start gap-2">
             <div>
               <strong>{{ group.row.unit.name }}</strong>
-              <small class="d-block text-muted">مانده {{ formatToman(group.row.remaining) }}</small>
+              <small class="d-block text-muted">
+                {{
+                  group.row.remaining > 0
+                    ? `مانده ${formatToman(group.row.remaining)}`
+                    : group.row.charge > 0
+                      ? 'تسویه کامل'
+                      : 'بدون شارژ'
+                }}
+              </small>
             </div>
-            <span class="chip" :class="group.row.remaining <= 0 && group.row.charge > 0 ? 'ok' : 'muted'">
-              {{ group.items.length.toLocaleString('fa-IR') }} دریافت
+            <span class="chip" :class="statusChip(group.row.charge, group.row.remaining).className">
+              {{ statusChip(group.row.charge, group.row.remaining).label }}
+              · {{ group.items.length.toLocaleString('fa-IR') }} دریافت
             </span>
           </div>
         </button>
@@ -88,7 +149,7 @@ async function onRemove(id: string) {
                 class="ghost-btn icon-action"
                 type="button"
                 aria-label="ویرایش"
-                @click="router.push(`/units/${group.row.unit.id}`)"
+                @click="router.push(`/units/${group.row.unit.id}?tab=pay`)"
               >
                 <AppIcon name="pencil" size="sm" />
                 <span class="action-label">ویرایش</span>

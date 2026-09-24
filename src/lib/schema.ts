@@ -28,6 +28,7 @@ export const SCHEMA_STATEMENTS = [
     unit_id INTEGER,
     parking_scope TEXT NOT NULL DEFAULT 'ALL',
     category TEXT NOT NULL DEFAULT 'سایر',
+    person_weight REAL,
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL
   )`,
@@ -58,4 +59,5 @@ export const SCHEMA_MIGRATIONS = [
   `ALTER TABLE expenses ADD COLUMN parking_scope TEXT NOT NULL DEFAULT 'ALL'`,
   `ALTER TABLE expenses ADD COLUMN category TEXT NOT NULL DEFAULT 'سایر'`,
   `ALTER TABLE settings ADD COLUMN expense_categories_json TEXT NOT NULL DEFAULT '[]'`,
+  `ALTER TABLE expenses ADD COLUMN person_weight REAL`,
 ] as const

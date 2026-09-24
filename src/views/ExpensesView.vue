@@ -5,7 +5,7 @@ import { RouterLink, useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
-import { COST_TYPES } from '../data/defaults'
+import { COST_TYPES, clampPersonWeight } from '../data/defaults'
 import { formatToman } from '../lib/format'
 import { useAppStore } from '../stores/app'
 import type { CostType } from '../types'
@@ -38,6 +38,13 @@ const filtered = computed(() =>
 
 function typeLabel(type: CostType) {
   return COST_TYPES.find((item) => item.value === type)?.label ?? type
+}
+
+function expenseTypeLabel(expense: { type: CostType; personWeight?: number }) {
+  const base = typeLabel(expense.type)
+  if (expense.type !== 'HYBRID') return base
+  const person = Math.round(clampPersonWeight(expense.personWeight) * 100)
+  return `${base} · ${person}٪ نفر`
 }
 
 async function onRemove(id: string) {
@@ -106,7 +113,7 @@ async function onRemove(id: string) {
     <div v-else class="stack">
       <article v-for="expense in filtered" :key="expense.id" class="panel expense-card">
         <button class="expense-open" type="button" @click="router.push(`/expenses/${expense.id}`)">
-          <span class="eyebrow">{{ expense.category }} · {{ typeLabel(expense.type) }}</span>
+          <span class="eyebrow">{{ expense.category }} · {{ expenseTypeLabel(expense) }}</span>
           <h3>{{ expense.title }}</h3>
           <small v-if="expense.notes" class="text-muted">{{ expense.notes }}</small>
         </button>

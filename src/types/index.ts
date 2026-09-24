@@ -1,4 +1,4 @@
-export type CostType = 'AREA' | 'EQUAL' | 'PERSON' | 'UNIT'
+export type CostType = 'AREA' | 'EQUAL' | 'PERSON' | 'HYBRID' | 'UNIT'
 export type CostNature = 'CURRENT' | 'CAPITAL'
 export type PartyRole = 'OWNER' | 'TENANT'
 export type ParkingScope = 'ALL' | 'WITH_PARKING' | 'WITHOUT_PARKING'
@@ -27,6 +27,8 @@ export interface Expense {
   period: string
   unitId?: number
   parkingScope: ParkingScope
+  /** سهم نفری در تقسیم ترکیبی (۰ تا ۱). فقط برای HYBRID معنا دارد؛ پیش‌فرض ۰٫۵ */
+  personWeight?: number
   notes: string
   createdAt: string
 }

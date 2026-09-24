@@ -8,14 +8,19 @@ import { useToast } from '../composables/useToast'
 import {
   COST_NATURES,
   COST_TYPES,
+  DEFAULT_PERSON_WEIGHT,
   PARKING_SCOPES,
+  PERSON_WEIGHT_PRESETS,
   catalogItemsForCategory,
+  clampPersonWeight,
+  costTypeLabel,
   inferNature,
   inferParkingScope,
   natureLabel,
   payerFor,
   partyLabel,
   parkingScopeLabel,
+  recommendSplit,
 } from '../data/defaults'
 import type { ExpenseCatalogItem } from '../data/defaults'
 import { amountInWords, formatPeople, formatToman, parseAmount } from '../lib/format'
@@ -42,6 +47,23 @@ const title = ref('')
 const amountText = ref('')
 const notes = ref('')
 const unitId = ref(store.state.units[0]?.id ?? 1)
+const personPercent = ref(Math.round(DEFAULT_PERSON_WEIGHT * 100))
+const advancedOpen = ref(false)
+const manualSplit = ref(false)
+const recommendReason = ref('')
+
+function applyRecommendation(force = false) {
+  if (isEdit.value && !force) return
+  if (manualSplit.value && !force) return
+  const rec = recommendSplit(category.value, title.value)
+  type.value = rec.type
+  nature.value = rec.nature
+  parkingScope.value = rec.parkingScope
+  recommendReason.value = rec.reason
+  if (rec.type === 'HYBRID') {
+    personPercent.value = Math.round(clampPersonWeight(rec.personWeight) * 100)
+  }
+}
 
 function hydrate() {
   const expense = existing.value
@@ -53,6 +75,13 @@ function hydrate() {
   amountText.value = expense ? String(expense.amount) : ''
   notes.value = expense?.notes ?? ''
   unitId.value = expense?.unitId ?? store.state.units[0]?.id ?? 1
+  personPercent.value = Math.round(clampPersonWeight(expense?.personWeight) * 100)
+  advancedOpen.value = false
+  manualSplit.value = Boolean(expense)
+  recommendReason.value = expense
+    ? COST_TYPES.find((item) => item.value === expense.type)?.hint ?? ''
+    : ''
+  if (!expense) applyRecommendation(true)
 }
 
 onMounted(hydrate)
@@ -61,6 +90,9 @@ watch(expenseId, hydrate)
 const titleSuggestions = computed(() => catalogItemsForCategory(category.value))
 const amount = computed(() => parseAmount(amountText.value))
 const words = computed(() => amountInWords(amount.value))
+const personWeight = computed(() => clampPersonWeight(personPercent.value / 100))
+const areaPercent = computed(() => 100 - personPercent.value)
+const typeMeta = computed(() => COST_TYPES.find((item) => item.value === type.value))
 
 const split = computed(() => {
   if (amount.value <= 0) return null
@@ -70,6 +102,7 @@ const split = computed(() => {
     nature: nature.value,
     unitId: type.value === 'UNIT' ? unitId.value : undefined,
     parkingScope: type.value === 'UNIT' ? 'ALL' : parkingScope.value,
+    personWeight: type.value === 'HYBRID' ? personWeight.value : undefined,
     category: category.value,
     title: title.value,
   })
@@ -77,34 +110,47 @@ const split = computed(() => {
 
 const canSave = computed(() => category.value.trim().length > 0 && title.value.trim().length > 0 && amount.value > 0)
 
-watch(type, (next) => {
-  if (isEdit.value) return
-  nature.value = inferNature(title.value, next)
+watch([category, title], () => {
+  if (!isEdit.value) applyRecommendation()
 })
 
-watch(title, (next) => {
-  if (isEdit.value || type.value === 'UNIT') return
-  parkingScope.value = inferParkingScope(next)
+watch(type, (next) => {
+  if (isEdit.value && manualSplit.value) return
+  if (!manualSplit.value) nature.value = inferNature(title.value, next)
 })
 
 function selectCategory(next: string) {
   category.value = next
   if (!isEdit.value && !titleSuggestions.value.some((item) => item.title === title.value)) {
     title.value = ''
+    manualSplit.value = false
   }
 }
 
 function useCatalogItem(item: ExpenseCatalogItem) {
   title.value = item.title
+  manualSplit.value = false
   type.value = item.type
   nature.value = item.nature
-  if (item.parkingScope) parkingScope.value = item.parkingScope
+  parkingScope.value = item.parkingScope ?? inferParkingScope(item.title)
+  recommendReason.value = COST_TYPES.find((row) => row.value === item.type)?.hint ?? ''
+  if (item.type === 'HYBRID') personPercent.value = Math.round(DEFAULT_PERSON_WEIGHT * 100)
+}
+
+function chooseType(next: CostType) {
+  manualSplit.value = true
+  type.value = next
+  nature.value = inferNature(title.value, next)
+  if (next !== 'UNIT') parkingScope.value = inferParkingScope(title.value)
+  recommendReason.value = COST_TYPES.find((item) => item.value === next)?.hint ?? ''
+  if (next === 'HYBRID') personPercent.value = Math.round(DEFAULT_PERSON_WEIGHT * 100)
 }
 
 function typeIcon(value: CostType) {
   if (value === 'AREA') return 'bounding-box'
   if (value === 'EQUAL') return 'grid-3x2'
   if (value === 'PERSON') return 'people'
+  if (value === 'HYBRID') return 'pie-chart'
   return 'house-door'
 }
 
@@ -117,6 +163,7 @@ function payload() {
     nature: nature.value,
     unitId: type.value === 'UNIT' ? unitId.value : undefined,
     parkingScope: type.value === 'UNIT' ? 'ALL' : parkingScope.value,
+    personWeight: type.value === 'HYBRID' ? personWeight.value : undefined,
     notes: notes.value,
   }
 }
@@ -144,7 +191,7 @@ async function onDelete() {
 
 <template>
   <div class="page">
-    <p class="note">دسته و عنوان را انتخاب کنید، سپس نوع تقسیم و مبلغ را وارد کنید.</p>
+    <p class="note">عنوان و مبلغ را بزنید؛ روش تقسیم پیشنهاد می‌شود. تنظیمات بیشتر اختیاری است.</p>
 
     <div class="field-group">
       <label class="form-label">دسته‌بندی</label>
@@ -179,91 +226,153 @@ async function onDelete() {
     </div>
 
     <div class="field-group">
-      <div class="d-flex align-items-center gap-2">
-        <label class="form-label mb-0">نوع تقسیم بین واحدها</label>
-        <InfoTip text="مبنای قانونی: متراژی (ماده ۴)، مساوی برای هزینه‌های غیرمرتبط با متراژ، نفری برای مصرف با ساکنان دائم و معادل مهمان همان ماه." />
-      </div>
-      <div class="type-grid">
-        <button
-          v-for="item in COST_TYPES"
-          :key="item.value"
-          class="type-btn"
-          :class="{ active: type === item.value }"
-          type="button"
-          @click="type = item.value"
-        >
-          <AppIcon :name="typeIcon(item.value)" />
-          <strong>{{ item.label }}</strong>
-          <small>{{ item.hint }}</small>
-        </button>
-      </div>
-    </div>
-
-    <div class="field-group">
-      <label class="form-label">ماهیت هزینه (مالک یا مستأجر)</label>
-      <div class="type-grid">
-        <button
-          v-for="item in COST_NATURES"
-          :key="item.value"
-          class="type-btn"
-          :class="{ active: nature === item.value }"
-          type="button"
-          @click="nature = item.value"
-        >
-          <AppIcon :name="item.value === 'CAPITAL' ? 'tools' : 'lightning-charge'" />
-          <strong>{{ item.label }}</strong>
-          <small>{{ item.hint }}</small>
-        </button>
-      </div>
-    </div>
-
-    <div v-if="type !== 'UNIT'" class="field-group">
-      <label class="form-label">مشمولیت پارکینگ</label>
-      <div class="type-grid">
-        <button
-          v-for="item in PARKING_SCOPES"
-          :key="item.value"
-          class="type-btn"
-          :class="{ active: parkingScope === item.value }"
-          type="button"
-          @click="parkingScope = item.value"
-        >
-          <AppIcon :name="item.value === 'WITH_PARKING' ? 'car-front' : item.value === 'WITHOUT_PARKING' ? 'car-front-fill' : 'buildings'" />
-          <strong>{{ item.label }}</strong>
-          <small>{{ item.hint }}</small>
-        </button>
-      </div>
-    </div>
-
-    <div class="field-group">
       <label class="form-label">مبلغ (تومان)</label>
       <input v-model="amountText" class="field" inputmode="numeric" placeholder="مثلاً ۱۲۰۰۰۰۰" />
       <small v-if="words" class="text-muted">{{ words }}</small>
     </div>
 
-    <div v-if="type === 'UNIT'" class="field-group">
+    <div class="field-group">
+      <div class="d-flex align-items-center gap-2 mb-2">
+        <label class="form-label mb-0">روش تقسیم</label>
+        <InfoTip text="پیشنهاد بر اساس عنوان و دسته است. برای بیشتر هزینه‌ها نیازی به تغییر نیست." />
+      </div>
+      <div class="recommend-card">
+        <p class="recommend-card__title">
+          <AppIcon :name="typeIcon(type)" size="sm" />
+          {{ costTypeLabel(type) }}
+          <span v-if="type === 'HYBRID'" class="text-muted">· {{ personPercent }}٪ نفر</span>
+        </p>
+        <p class="recommend-card__reason">{{ recommendReason || typeMeta?.hint }}</p>
+        <button class="ghost-btn w-100" type="button" @click="advancedOpen = !advancedOpen">
+          <AppIcon :name="advancedOpen ? 'chevron-up' : 'sliders'" size="sm" />
+          {{ advancedOpen ? 'بستن تنظیمات' : 'تغییر روش و تنظیمات پیشرفته' }}
+        </button>
+      </div>
+    </div>
+
+    <div v-if="type === 'UNIT' && !advancedOpen" class="field-group">
       <label class="form-label">واحد مسئول</label>
       <select v-model.number="unitId" class="field">
         <option v-for="unit in store.state.units" :key="unit.id" :value="unit.id">{{ unit.name }}</option>
       </select>
     </div>
 
-    <div class="field-group">
+    <div v-if="advancedOpen" class="stack" style="margin-bottom: 16px">
+      <div class="field-group">
+        <label class="form-label">انتخاب روش</label>
+        <div class="type-grid">
+          <button
+            v-for="item in COST_TYPES"
+            :key="item.value"
+            class="type-btn"
+            :class="{ active: type === item.value }"
+            type="button"
+            @click="chooseType(item.value)"
+          >
+            <AppIcon :name="typeIcon(item.value)" />
+            <strong>{{ item.label }}</strong>
+            <small>{{ item.hint }}</small>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="type === 'HYBRID'" class="field-group">
+        <div class="d-flex align-items-center gap-2">
+          <label class="form-label mb-0">وزن ترکیبی</label>
+          <InfoTip text="سهم = α×نفری + (۱−α)×متراژی. مهمان فقط روی بخش نفری اثر دارد." />
+        </div>
+        <p class="hybrid-summary">{{ personPercent }}٪ نفری · {{ areaPercent }}٪ متراژی</p>
+        <input
+          v-model.number="personPercent"
+          class="hybrid-range"
+          type="range"
+          min="0"
+          max="100"
+          step="5"
+          aria-label="درصد سهم نفری"
+          @change="manualSplit = true"
+        />
+        <div class="quick-tags">
+          <button
+            v-for="preset in PERSON_WEIGHT_PRESETS"
+            :key="preset.personPercent"
+            type="button"
+            :class="{ active: personPercent === preset.personPercent }"
+            @click="personPercent = preset.personPercent; manualSplit = true"
+          >
+            {{ preset.label }}
+          </button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="form-label">ماهیت هزینه (مالک یا مستأجر)</label>
+        <div class="type-grid">
+          <button
+            v-for="item in COST_NATURES"
+            :key="item.value"
+            class="type-btn"
+            :class="{ active: nature === item.value }"
+            type="button"
+            @click="nature = item.value; manualSplit = true"
+          >
+            <AppIcon :name="item.value === 'CAPITAL' ? 'tools' : 'lightning-charge'" />
+            <strong>{{ item.label }}</strong>
+            <small>{{ item.hint }}</small>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="type !== 'UNIT'" class="field-group">
+        <label class="form-label">مشمولیت پارکینگ</label>
+        <div class="type-grid">
+          <button
+            v-for="item in PARKING_SCOPES"
+            :key="item.value"
+            class="type-btn"
+            :class="{ active: parkingScope === item.value }"
+            type="button"
+            @click="parkingScope = item.value; manualSplit = true"
+          >
+            <AppIcon
+              :name="item.value === 'WITH_PARKING' ? 'car-front' : item.value === 'WITHOUT_PARKING' ? 'car-front-fill' : 'buildings'"
+            />
+            <strong>{{ item.label }}</strong>
+            <small>{{ item.hint }}</small>
+          </button>
+        </div>
+      </div>
+
+      <div v-if="type === 'UNIT'" class="field-group">
+        <label class="form-label">واحد مسئول</label>
+        <select v-model.number="unitId" class="field" @change="manualSplit = true">
+          <option v-for="unit in store.state.units" :key="unit.id" :value="unit.id">{{ unit.name }}</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label class="form-label">یادداشت (اختیاری)</label>
+        <textarea v-model="notes" class="field" rows="2" />
+      </div>
+    </div>
+
+    <div v-else class="field-group">
       <label class="form-label">یادداشت (اختیاری)</label>
       <textarea v-model="notes" class="field" rows="2" />
     </div>
 
     <div v-if="split" class="panel">
       <strong class="d-block mb-2">
-        پیش‌نمایش · {{ category }} · {{ natureLabel(nature) }}
+        پیش‌نمایش سهم‌ها · {{ costTypeLabel(type) }} · {{ natureLabel(nature) }}
         <span v-if="type !== 'UNIT'" class="text-muted"> · {{ parkingScopeLabel(parkingScope) }}</span>
+        <span v-if="type === 'HYBRID'" class="text-muted"> · {{ personPercent }}٪ نفر</span>
       </strong>
       <div v-for="unit in store.state.units" :key="unit.id" class="split-row">
         <span>
           {{ unit.name }}
           <small class="text-muted">
             ({{ partyLabel(payerFor(unit, nature)) }}
-            <template v-if="type === 'PERSON'">
+            <template v-if="type === 'PERSON' || type === 'HYBRID'">
               · {{ formatPeople(store.summaries.find((row) => row.unit.id === unit.id)?.occupancy ?? unit.residents) }} نفر
             </template>)
           </small>
@@ -290,5 +399,17 @@ async function onDelete() {
   background: var(--primary-soft);
   color: var(--primary-dark);
   border-color: var(--primary);
+}
+
+.hybrid-summary {
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.hybrid-range {
+  width: 100%;
+  margin-bottom: 0.75rem;
+  accent-color: var(--primary);
 }
 </style>

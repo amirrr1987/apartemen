@@ -2,7 +2,7 @@ import { computed, reactive, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 import { useDebounceFn } from '@vueuse/core'
 import { monthSummaries, monthTotals, splitExpense } from '../lib/calc'
-import { createDefaultState, createEmptyUnit, catalogCategoryLabels, hasTenant, inferCategory, inferNature, inferParkingScope, partyLabel, parkingLabel } from '../data/defaults'
+import { createDefaultState, createEmptyUnit, catalogCategoryLabels, clampPersonWeight, hasTenant, inferCategory, inferNature, inferParkingScope, partyLabel, parkingLabel, DEFAULT_PERSON_WEIGHT } from '../data/defaults'
 import { isDbConfigured, loadAppState, saveAppState } from '../lib/db'
 import { newId } from '../lib/format'
 import { currentPeriod } from '../lib/jalali'
@@ -49,6 +49,7 @@ function normalizeExpense(expense: Partial<Expense> & Pick<Expense, 'id' | 'titl
     period: expense.period,
     unitId: expense.unitId,
     parkingScope: expense.parkingScope ?? inferParkingScope(expense.title),
+    personWeight: type === 'HYBRID' ? clampPersonWeight(expense.personWeight) : undefined,
     notes: expense.notes ?? '',
     createdAt: expense.createdAt,
   }
@@ -237,6 +238,7 @@ export const useAppStore = defineStore('app', () => {
     nature: CostNature
     unitId?: number
     parkingScope?: ParkingScope
+    personWeight?: number
     notes?: string
   }): Expense {
     const category = input.category.trim() || inferCategory(input.title)
@@ -251,6 +253,7 @@ export const useAppStore = defineStore('app', () => {
       period: state.currentPeriod,
       unitId: input.unitId,
       parkingScope: input.parkingScope ?? (input.type === 'UNIT' ? 'ALL' : inferParkingScope(input.title)),
+      personWeight: input.type === 'HYBRID' ? clampPersonWeight(input.personWeight) : undefined,
       notes: input.notes?.trim() ?? '',
       createdAt: new Date().toISOString(),
     }
@@ -268,6 +271,7 @@ export const useAppStore = defineStore('app', () => {
       nature: CostNature
       unitId?: number
       parkingScope?: ParkingScope
+      personWeight?: number
       notes?: string
     },
   ) {
@@ -283,6 +287,7 @@ export const useAppStore = defineStore('app', () => {
     expense.unitId = input.type === 'UNIT' ? input.unitId : undefined
     expense.parkingScope =
       input.type === 'UNIT' ? 'ALL' : (input.parkingScope ?? inferParkingScope(expense.title))
+    expense.personWeight = input.type === 'HYBRID' ? clampPersonWeight(input.personWeight) : undefined
     expense.notes = input.notes?.trim() ?? ''
   }
 
@@ -290,7 +295,9 @@ export const useAppStore = defineStore('app', () => {
     state.expenses = state.expenses.filter((expense) => expense.id !== id)
   }
 
-  function previewSplit(expense: Pick<Expense, 'amount' | 'type' | 'unitId' | 'parkingScope' | 'nature' | 'category' | 'title'>) {
+  function previewSplit(
+    expense: Pick<Expense, 'amount' | 'type' | 'unitId' | 'parkingScope' | 'nature' | 'category' | 'title' | 'personWeight'>,
+  ) {
     return splitExpense(
       {
         id: 'preview',
@@ -302,6 +309,7 @@ export const useAppStore = defineStore('app', () => {
         period: state.currentPeriod,
         unitId: expense.unitId,
         parkingScope: expense.parkingScope ?? 'ALL',
+        personWeight: expense.type === 'HYBRID' ? clampPersonWeight(expense.personWeight, DEFAULT_PERSON_WEIGHT) : undefined,
         notes: '',
         createdAt: '',
       },

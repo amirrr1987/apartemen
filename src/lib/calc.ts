@@ -1,4 +1,4 @@
-import { inferNature, payerFor } from '../data/defaults'
+import { inferNature, payerFor, clampPersonWeight, DEFAULT_PERSON_WEIGHT } from '../data/defaults'
 import type { AppState, Expense, ParkingScope, Unit, UnitGuestStay, UnitMonthSummary } from '../types'
 import { daysInPeriod } from './jalali'
 
@@ -86,20 +86,30 @@ export function splitExpense(
     })
   }
 
+  const equalRatio = () => pool.map(() => 1 / count)
+  const areaRatio = () => pool.map((unit) => (area > 0 ? unit.area / area : 1 / count))
+  const personRatio = () =>
+    people > 0
+      ? pool.map((unit) => occupancyOf(unit, guestNightsOf(unit.id, period, stays), days) / people)
+      : equalRatio()
+
   switch (expense.type) {
     case 'AREA':
-      assign(pool.map((unit) => (area > 0 ? unit.area / area : 1 / count)))
+      assign(areaRatio())
       break
     case 'EQUAL':
-      assign(pool.map(() => 1 / count))
+      assign(equalRatio())
       break
     case 'PERSON':
-      assign(
-        people > 0
-          ? pool.map((unit) => occupancyOf(unit, guestNightsOf(unit.id, period, stays), days) / people)
-          : pool.map(() => 1 / count),
-      )
+      assign(personRatio())
       break
+    case 'HYBRID': {
+      const α = clampPersonWeight(expense.personWeight, DEFAULT_PERSON_WEIGHT)
+      const persons = personRatio()
+      const areas = areaRatio()
+      assign(pool.map((_, i) => α * (persons[i] ?? 0) + (1 - α) * (areas[i] ?? 0)))
+      break
+    }
     case 'UNIT':
       if (expense.unitId != null && pool.some((unit) => unit.id === expense.unitId)) {
         result[expense.unitId] = Math.round(expense.amount)

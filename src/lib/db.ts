@@ -1,5 +1,5 @@
 import { createClient, type Client } from '@libsql/client/web'
-import { createDefaultState, inferCategory } from '../data/defaults'
+import { createDefaultState, clampPersonWeight, inferCategory } from '../data/defaults'
 import { currentPeriod } from './jalali'
 import { SCHEMA_MIGRATIONS, SCHEMA_STATEMENTS } from './schema'
 import { normalizeTursoToken } from './turso-token'
@@ -66,16 +66,22 @@ function rowUnit(row: Record<string, unknown>): Unit {
 
 function rowExpense(row: Record<string, unknown>): Expense {
   const title = String(row.title)
+  const type = migrateCostType(String(row.type))
+  const rawWeight = row.person_weight
   return {
     id: String(row.id),
     category: String(row.category ?? inferCategory(title)),
     title,
     amount: Number(row.amount),
-    type: migrateCostType(String(row.type)),
+    type,
     nature: row.nature as Expense['nature'],
     period: String(row.period),
     unitId: row.unit_id == null ? undefined : Number(row.unit_id),
     parkingScope: (row.parking_scope as Expense['parkingScope']) ?? 'ALL',
+    personWeight:
+      type === 'HYBRID'
+        ? clampPersonWeight(rawWeight == null ? undefined : Number(rawWeight))
+        : undefined,
     notes: String(row.notes ?? ''),
     createdAt: String(row.created_at),
   }
@@ -188,8 +194,8 @@ export async function saveAppState(state: AppState, db: Client = getDbClient()):
     })),
     ...state.expenses.map((expense) => ({
       sql: `INSERT INTO expenses (
-        id, title, amount, type, nature, period, unit_id, parking_scope, category, notes, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        id, title, amount, type, nature, period, unit_id, parking_scope, category, person_weight, notes, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         expense.id,
         expense.title,
@@ -200,6 +206,7 @@ export async function saveAppState(state: AppState, db: Client = getDbClient()):
         expense.unitId ?? null,
         expense.parkingScope,
         expense.category,
+        expense.type === 'HYBRID' ? clampPersonWeight(expense.personWeight) : null,
         expense.notes,
         expense.createdAt,
       ] as (string | number | null)[],

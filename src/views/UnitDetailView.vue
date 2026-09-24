@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AppIcon from '../components/AppIcon.vue'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
-import { COST_TYPES, hasTenant, natureLabel, partyLabel } from '../data/defaults'
+import { COST_TYPES, clampPersonWeight, hasTenant, natureLabel, partyLabel } from '../data/defaults'
 import { occupancyOf } from '../lib/calc'
 import { formatFaDate, daysInPeriod, periodLabel } from '../lib/jalali'
 import { formatPeople, formatToman, parseAmount } from '../lib/format'
@@ -27,6 +27,20 @@ watch(unit, (value) => {
 }, { immediate: true })
 
 const tab = ref<'pay' | 'split' | 'info'>('pay')
+
+function tabFromQuery(raw: unknown): 'pay' | 'split' | 'info' {
+  const value = Array.isArray(raw) ? raw[0] : raw
+  if (value === 'split' || value === 'info' || value === 'pay') return value
+  return 'pay'
+}
+
+watch(
+  () => route.query.tab,
+  (value) => {
+    tab.value = tabFromQuery(value)
+  },
+  { immediate: true },
+)
 
 const residentsText = ref(String(unit.value?.residents ?? 0))
 const guestNightsText = ref(String(store.guestNights(unitId.value)))
@@ -69,6 +83,13 @@ const guestEquivalentDraft = computed(() => occupancyDraft.value - Math.max(0, M
 
 function typeLabel(type: string) {
   return COST_TYPES.find((item) => item.value === type)?.label ?? type
+}
+
+function splitLabel(expense: { type: string; personWeight?: number }) {
+  const base = typeLabel(expense.type)
+  if (expense.type !== 'HYBRID') return base
+  const person = Math.round(clampPersonWeight(expense.personWeight) * 100)
+  return `${base} ${person}٪ نفر`
 }
 
 function receiptPartyLabel(party?: PartyRole) {
@@ -260,7 +281,7 @@ function togglePaid(party?: PartyRole) {
           <span>
             {{ row.expense.category }} · {{ row.expense.title }}
             <small class="text-muted">
-              ({{ typeLabel(row.expense.type) }} · {{ natureLabel(row.expense.nature) }} · {{ partyLabel(row.payer) }})
+              ({{ splitLabel(row.expense) }} · {{ natureLabel(row.expense.nature) }} · {{ partyLabel(row.payer) }})
             </small>
           </span>
           <span>{{ formatToman(row.share) }}</span>
