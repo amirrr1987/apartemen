@@ -1,7 +1,6 @@
 import { createPinia } from 'pinia'
 import { gsap } from 'gsap'
 import { createApp } from 'vue'
-import 'bootstrap/dist/css/bootstrap.rtl.min.css'
 import 'bootstrap-icons/font/bootstrap-icons.css'
 import 'vazirmatn/Vazirmatn-Variable-font-face.css'
 import './styles/app.css'

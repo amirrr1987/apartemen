@@ -14,12 +14,10 @@
   "dependencies": {
     "@libsql/client": "^0.15.15",
     "@persian-tools/persian-tools": "^4.0.4",
-    "@popperjs/core": "^2.11.8",
     "@vueuse/core": "^14.4.0",
     "@vueuse/gesture": "^2.0.0",
     "@vueuse/integrations": "^14.4.0",
     "@vueuse/router": "^14.4.0",
-    "bootstrap": "^5.3.8",
     "bootstrap-icons": "^1.13.1",
     "date-fns-jalali": "4.4.0-0",
     "gsap": "^3.15.0",
