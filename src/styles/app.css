@@ -1157,14 +1157,19 @@ a.fab {
 }
 
 .info-tip-box {
+  position: absolute;
   z-index: 50;
-  max-width: 220px;
+  bottom: calc(100% + 8px);
+  inset-inline-end: 0;
+  width: max-content;
+  max-width: min(220px, 70vw);
   padding: 10px 12px;
   background: var(--ink);
   color: #fff;
   border-radius: var(--radius-sm);
   font-size: 0.78rem;
   line-height: 1.5;
+  box-shadow: var(--shadow-md);
 }
 
 .confirm-backdrop {
